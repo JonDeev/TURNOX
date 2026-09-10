@@ -1,0 +1,7 @@
+# Fragmento para revisar y aplicar manualmente en /etc/gdm3/custom.conf.
+# No sobrescribir el archivo completo: conservar la configuración aprobada
+# de la imagen Ubuntu Desktop y modificar solo la sección [daemon].
+
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=turnox-kiosk

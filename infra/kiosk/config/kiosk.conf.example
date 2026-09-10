@@ -1,0 +1,23 @@
+# Copiar como /etc/turnox/kiosk.conf en un mini-PC real.
+# Esta plantilla no contiene valores de sede, IPs, certificados ni secretos.
+# El archivo instalado debe ser root:turnox-kiosk, modo 0640.
+
+# Obligatorios. Usar HTTPS y el nombre DNS aprobado por infraestructura.
+TURN0X_KIOSK_URL=
+TURN0X_HOSTNAME=
+TURN0X_TIMEZONE=
+TURN0X_NTP_SERVERS=
+
+# Rutas de software de la imagen Ubuntu aprobada.
+TURN0X_CHROMIUM_BINARY=/usr/bin/chromium
+TURN0X_CAGE_BINARY=/usr/bin/cage
+
+# Estado local no sensible del usuario dedicado.
+TURN0X_CHROMIUM_PROFILE_DIR=/var/lib/turnox-kiosk/chromium-profile
+
+# Opcional. Separar flags por espacios. Nunca agregar flags que desactiven TLS,
+# sandbox, aislamiento web o validaciones de seguridad.
+TURN0X_CHROMIUM_EXTRA_FLAGS=--disable-pinch --overscroll-history-navigation=0
+
+# Opcional. Ruta externa a una CA gestionada; no guardar el certificado aquí.
+TURN0X_CA_CERT_PATH=

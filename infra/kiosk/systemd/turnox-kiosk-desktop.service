@@ -1,0 +1,25 @@
+[Unit]
+Description=TURNOX Kiosk Chromium (Option B, existing Desktop session)
+ConditionPathExists=/etc/turnox/kiosk.conf
+PartOf=graphical-session.target
+After=graphical-session.target
+StartLimitIntervalSec=60s
+StartLimitBurst=5
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/turnox/kiosk.conf
+Environment=HOME=%h
+ExecStartPre=/usr/local/libexec/turnox-kiosk/validate-config.sh
+ExecStart=/usr/local/libexec/turnox-kiosk/launch-chromium.sh
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=graphical-session.target

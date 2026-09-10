@@ -1,6 +1,6 @@
 # TURNOX — Implementation Status
 
-Último prompt: P0.1 — Matriz de validación física  
+Último prompt: P0.2 — Baseline Linux del kiosco
 Fase actual: 0 — Hardware e infraestructura  
 Estado: BLOQUEADO
 
@@ -20,6 +20,8 @@ Estado: BLOQUEADO
 - Creación de `docs/adr/` para el registro de decisiones arquitectónicas.
 - Matriz profesional de validación física e infraestructura en [`docs/pilot/HARDWARE_VALIDATION.md`](pilot/HARDWARE_VALIDATION.md).
 - Puertas de entrada para Fase 0, Fase 1, Fase 2 y piloto, con estados `PENDIENTE`, `PASS`, `FAIL` y `NO_APLICA`.
+- Baseline documental y declarativo en [`infra/kiosk/`](../infra/kiosk/): usuario dedicado, configuración externa, perfiles separados para Ubuntu Server + `cage` y Ubuntu Desktop endurecido, unidades systemd, recuperación, reloj/NTP, hostname y runbooks.
+- Procedimiento HW-08 para validar en una unidad real la idempotencia, permisos, diagnóstico y separación de configuración del baseline.
 
 ## Validaciones
 
@@ -44,7 +46,7 @@ Estado: BLOQUEADO
 - No existe una unidad física validada de cada componente: mini-PC/atril, pantalla táctil, impresora POS, TV Box/televisor, red y UPS.
 - Falta seleccionar y validar la marca/modelo exactos de la impresora POS.
 - Falta confirmar USB, ESC/POS, cortador y realimentación de estado de papel/tapa/offline de la POS.
-- Falta decidir la variante del atril: Ubuntu Server + `cage` o Ubuntu Desktop endurecido.
+- La variante documental del atril quedó confirmada como Ubuntu Desktop endurecido + Chromium; falta validarla físicamente y demostrar la sesión dedicada.
 - Falta seleccionar y validar el TV Box real y su mecanismo de dispositivo dedicado/autoarranque (launcher, Device Owner/Lock Task, MDM u otra opción soportada).
 - Falta validar físicamente calibración táctil, Chromium kiosco, regla udev, impresión, Ethernet, HDMI/overscan, audio, almacenamiento, autoarranque y recuperación tras cortes.
 - Falta validar conectividad LAN, operación sin Internet externo y latencia básica extremo a extremo.
@@ -83,9 +85,25 @@ Estado: BLOQUEADO
 
 - No se detectaron errores físicos: no fue posible ejecutar pruebas físicas ni simular cortes, desconexiones o carga de red.
 - Se detectó como bloqueo de evidencia la ausencia de inventario real de equipos y de una sede de prueba disponible.
-- Se detectó que varias decisiones que V4 marca como pendientes —impresora, distribución del atril, TV Box, DNS/PKI/TLS, UPS, RPO y RTO— no pueden cerrarse desde documentación o recomendación de IA.
+- Se detectó que varias decisiones que V4 marca como pendientes —impresora, TV Box, DNS/PKI/TLS, UPS, RPO y RTO— no pueden cerrarse desde documentación o recomendación de IA. La selección de Ubuntu Desktop fue confirmada explícitamente por el responsable, pero aún requiere evidencia física.
 - La matriz no autoriza marcar una capacidad como confirmada sin evidencia primaria de la unidad y configuración probadas.
+
+## Entregado en P0.2 — baseline del kiosco Linux
+
+- Se confirmó Opción B (`Ubuntu Desktop endurecido + Chromium`) como perfil activo; Opción A (`Ubuntu Server + cage + Chromium`) permanece versionada como alternativa no activa.
+- Se prepararon plantillas para configuración externa, servicio systemd de Chromium, servicio systemd con `cage`, perfil candidato de endurecimiento Desktop, configuración de hostname y zona horaria/NTP LAN.
+- Se documentaron start, stop, status, logs, recuperación, rollback, BIOS y validaciones que requieren acceso físico.
+- El instalador es deliberadamente conservador: crea el usuario dedicado y archivos del baseline, conserva una configuración existente y no instala paquetes, habilita servicios ni toca BIOS.
+- No se implementó funcionalidad de TURNOX: React, NestJS, PostgreSQL, tickets, Print Agent, Docker y lógica de negocio permanecen fuera de alcance.
+
+## Validaciones de P0.2
+
+- Estructura revisada con `find` y estado Git; solo se añadieron `infra/kiosk/` y cambios documentales solicitados.
+- Se ejecutaron comprobaciones sintácticas de Bash. `systemd-analyze verify` no reportó errores de sintaxis de las unidades; su validación completa quedó limitada porque las rutas `/usr/local/libexec/turnox-kiosk/*` solo existen después de ejecutar el instalador en Ubuntu real.
+- Se comprobó que no hay URL real, IP, certificado, credencial o secreto embebido en el baseline.
+- No se ejecutó `install.sh`, `configure-hostname.sh`, `configure-time.sh` ni ninguna activación sobre un mini-PC real.
+- HW-01 a HW-08 continúan `PENDIENTE`; la actualización de HW-08 no marca ninguna prueba física como `PASS`.
 
 ## Próximo prompt
 
-P0.2 — Validación física e infraestructura según la matriz, únicamente con equipos y responsables disponibles.
+P0.3 — Validación física del atril Ubuntu Desktop e infraestructura únicamente con equipos y responsables disponibles.

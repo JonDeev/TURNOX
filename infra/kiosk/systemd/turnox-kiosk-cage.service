@@ -1,0 +1,43 @@
+[Unit]
+Description=TURNOX Kiosk compositor and Chromium (Option A)
+ConditionPathExists=/etc/turnox/kiosk.conf
+After=systemd-user-sessions.service network.target
+StartLimitIntervalSec=60s
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=turnox-kiosk
+Group=turnox-kiosk
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+EnvironmentFile=/etc/turnox/kiosk.conf
+Environment=HOME=/var/lib/turnox-kiosk
+Environment=XDG_CONFIG_HOME=/var/lib/turnox-kiosk/config
+Environment=XDG_CACHE_HOME=/var/cache/turnox-kiosk
+RuntimeDirectory=turnox-kiosk
+StateDirectory=turnox-kiosk
+CacheDirectory=turnox-kiosk
+ExecStartPre=/usr/local/libexec/turnox-kiosk/validate-config.sh
+ExecStart=/usr/local/libexec/turnox-kiosk/launch-cage.sh
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/turnox-kiosk /var/cache/turnox-kiosk /run/turnox-kiosk
+
+[Install]
+WantedBy=multi-user.target

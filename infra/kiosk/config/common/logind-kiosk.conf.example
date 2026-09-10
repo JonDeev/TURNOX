@@ -1,0 +1,10 @@
+# Instalar como /etc/systemd/logind.conf.d/turnox-kiosk.conf después de revisar
+# la política de mantenimiento de la sede. No se aplica automáticamente.
+
+[Login]
+HandlePowerKey=ignore
+HandleSuspendKey=ignore
+HandleHibernateKey=ignore
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+IdleAction=ignore
