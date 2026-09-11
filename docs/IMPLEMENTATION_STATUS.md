@@ -1,8 +1,8 @@
 # TURNOX — Implementation Status
 
-Último prompt: P1.3
-Fase actual: 1; siguiente: P1.4 — Autenticación, RBAC y contratos base
-Estado: P1.3 — COMPLETADO Y VALIDADO
+Último prompt: P1.4
+Fase actual: 1; siguiente: P1.GATE — Cierre de Fase 1
+Estado: P1.4 — COMPLETADO Y VALIDADO; Fase 1 aún no cerrada
 
 ## Resultado del GATE
 
@@ -358,8 +358,76 @@ modificación y continúan diferidas a las fases indicadas.
 - No se implementaron login, password/password_hash, auth guards, RBAC, cookies, access/refresh tokens ni sesiones; tampoco se añadió CRUD HTTP de auditoría.
 - Deuda técnica real: P1.4 debe conectar el contexto autenticado con `actorUserId`/`actorType` y autorización server-side; no requiere rediseñar la tabla. La retención y consulta operativa de auditoría se definirán cuando exista el alcance correspondiente, sin convertirla en Event Log realtime.
 
+## Entregado en P1.4 — autenticación, RBAC y contratos base
+
+- Mecanismo V4 implementado: Argon2id para contraseñas y sesión web
+  server-side mediante cookie HttpOnly; no JWT, refresh tokens ni
+  `localStorage`.
+- `User` extendido con `UserRole`, `passwordHash` nullable para compatibilidad
+  incremental, contadores de fallo y bloqueo temporal. Los roles exactos son
+  `SUPERADMINISTRADOR`, `ADMINISTRADOR`, `SUPERVISOR` y `ASESOR`.
+- `AuthSession` persistente con token aleatorio de 256 bits, hash SHA-256,
+  usuario/organización, creación, última actividad, expiración y revocación.
+  Se añadió índice de sesiones activas/expiración y unicidad del hash.
+- Cookies configurables y tipadas: sesión `HttpOnly`, `Secure` obligatorio en
+  producción, `SameSite=lax` por defecto, `Path=/`, expiración; CSRF
+  double-submit para mutaciones mediante `X-CSRF-Token`.
+- Guards separados para autenticación, CSRF y autorización; el contexto
+  confiable contiene usuario, organización, sede, rol y expiración. Las
+  mutaciones administrativas usan ese contexto para `actorUserId` dentro de la
+  misma transacción que la auditoría.
+- Matriz explícita backend de rol a permisos. Se aplican organización y sede
+  en lecturas, escrituras, asignaciones y recursos anidados; los IDs de URL,
+  body, query y headers no prueban pertenencia.
+- Endpoints: `GET /auth/csrf`, `POST /auth/login`, `POST /auth/logout` y
+  `GET /auth/me`.
+- Contratos estables de roles, identidad pública, sesión y error en
+  [`packages/contracts/src/index.ts`](../packages/contracts/src/index.ts).
+  No incluyen Prisma, hashes ni internals de sesión.
+- OpenAPI base en [`docs/openapi.yaml`](openapi.yaml), AsyncAPI 3.1 base en
+  [`docs/asyncapi.yaml`](asyncapi.yaml) y ADR aplicado en
+  [`docs/adr/ADR-020-web-authentication-and-rbac.md`](adr/ADR-020-web-authentication-and-rbac.md).
+- Migración incremental:
+  [`20260911120000_add_authentication_and_rbac`](../apps/api/prisma/migrations/20260911120000_add_authentication_and_rbac/migration.sql).
+  Las migraciones anteriores permanecen sin modificar.
+
+## Validaciones de P1.4
+
+- `pnpm install --frozen-lockfile` — PASS.
+- `prisma validate` y `prisma generate` — PASS.
+- `prisma migrate status` y `prisma migrate deploy` sobre PostgreSQL local — PASS; 3 migraciones aplicadas.
+- Unit tests de Argon2id, configuración, bootstrap, salud y contrato de errores — PASS.
+- Integration tests reales PostgreSQL — PASS: login correcto/incorrecto/inexistente/inactivo, cookies, almacenamiento derivado de sesión, logout/revocación, expiración, endpoint protegido, RBAC, aislamiento de organización, scope de sede, CSRF, auditoría con actor autenticado, constraints y regresión organizacional.
+- Prueba de migración desde base temporal vacía — PASS: se creó
+  `turnox_p14_empty_final`, se aplicaron en orden las 3 migraciones
+  (`initial_organizational_operational_model`, `add_admin_audit_logs` y
+  `add_authentication_and_rbac`), se comprobaron `_prisma_migrations`,
+  `users`, `admin_audit_logs` y `auth_sessions`, y la base temporal fue
+  eliminada después.
+- `pnpm build` — PASS.
+- `pnpm lint` — PASS.
+- `pnpm typecheck` — PASS.
+- `pnpm test` — PASS: suite completa del monorepo; API 10 tests pasados y 8
+  integration tests omitidos por no habilitarse en el comando unitario.
+- `pnpm format:check` — PASS.
+- `git diff --check` — PASS.
+
+## Decisiones, bloqueadores y deuda de P1.4
+
+- Se usa la API nativa de Node 24.20.0 para Argon2id; no se añadió una
+  dependencia criptográfica adicional.
+- Rate limiting y bloqueo son locales a una instancia, conforme al alcance de
+  Fase 1 y sin Redis. Para despliegue multi-instancia se debe resolver un
+  limitador compartido en hardening.
+- V4 no define un mecanismo de bootstrap inicial para crear la primera
+  organización y su primer superadministrador. No se inventaron credenciales
+  ni una ruta pública insegura; queda como decisión operativa previa al uso
+  productivo.
+- No se implementaron `AdvisorSession`, turnos, Queue Engine, realtime,
+  Outbox, PrintJob, pairing, heartbeat, Display ni multimedia.
+
 ## Próximo prompt
 
-P1.3 — APROBADO PARA CONTINUAR A P1.4
+P1.4 — APROBADO PARA CONTINUAR A P1.GATE
 
-Próximo prompt: P1.4 — Autenticación, RBAC y contratos base
+Próximo prompt: P1.GATE — Cierre de Fase 1

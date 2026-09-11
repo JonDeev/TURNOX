@@ -13,6 +13,13 @@ enum DeviceType {
   DISPLAY
 }
 
+enum UserRole {
+  SUPERADMINISTRADOR
+  ADMINISTRADOR
+  SUPERVISOR
+  ASESOR
+}
+
 enum AdminAuditActorType {
   UNAUTHENTICATED
   USER
@@ -53,6 +60,7 @@ model Organization {
   serviceAssignments ServiceAssignment[]
   devices            Device[]
   adminAuditLogs     AdminAuditLog[]
+  authSessions       AuthSession[]
 
   @@index([active])
   @@map("organizations")
@@ -141,24 +149,48 @@ model Counter {
 }
 
 model User {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @db.Uuid
-  siteId         String?  @db.Uuid
-  email          String   @db.VarChar(320)
-  fullName       String   @db.VarChar(160)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+  id                  String    @id @default(uuid()) @db.Uuid
+  organizationId      String    @db.Uuid
+  siteId              String?   @db.Uuid
+  email               String    @db.VarChar(320)
+  fullName            String    @db.VarChar(160)
+  role                UserRole  @default(ASESOR)
+  passwordHash        String?   @db.VarChar(255)
+  active              Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lastFailedLoginAt   DateTime? @db.Timestamptz(3)
+  lockedUntil         DateTime? @db.Timestamptz(3)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @default(now()) @db.Timestamptz(3)
 
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   site           Site?               @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
   assignments    ServiceAssignment[]
   adminAuditLogs AdminAuditLog[]     @relation("AdminAuditActor")
+  authSessions   AuthSession[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, email])
   @@index([organizationId, siteId, active])
   @@map("users")
+}
+
+model AuthSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  userId         String    @db.Uuid
+  tokenHash      String    @unique @db.VarChar(64)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt      DateTime  @db.Timestamptz(3)
+  lastSeenAt     DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, userId, expiresAt])
+  @@index([expiresAt, revokedAt])
+  @@map("auth_sessions")
 }
 
 model ServiceAssignment {
@@ -213,7 +245,7 @@ model AdminAuditLog {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   site         Site?        @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
-  actorUser    User?        @relation("AdminAuditActor", fields: [organizationId, actorUserId], references: [organizationId, id], onDelete: Restrict)
+  actorUser    User?        @relation("AdminAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, createdAt])
   @@index([resourceType, resourceId])

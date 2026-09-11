@@ -1,5 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+} from 'class-validator';
+import { AUTH_ROLES, type AuthRole } from '../../auth/roles.js';
 import { PaginationQueryDto, parseBooleanQuery } from '../../common/pagination.dto.js';
 
 export class CreateUserDto {
@@ -15,6 +25,13 @@ export class CreateUserDto {
   @Length(1, 160)
   @Matches(/\S/)
   fullName!: string;
+
+  @IsIn(AUTH_ROLES)
+  role!: AuthRole;
+
+  @IsString()
+  @Length(8, 256)
+  password!: string;
 }
 
 export class UpdateUserDto {
@@ -32,6 +49,10 @@ export class UpdateUserDto {
   @Length(1, 160)
   @Matches(/\S/)
   fullName?: string;
+
+  @IsOptional()
+  @IsIn(AUTH_ROLES)
+  role?: AuthRole;
 
   @IsOptional()
   @Transform(({ value }) => parseBooleanQuery(value))
@@ -56,6 +77,7 @@ export class UserResponseDto {
   readonly siteId!: string | null;
   readonly email!: string;
   readonly fullName!: string;
+  readonly role!: AuthRole;
   readonly active!: boolean;
   readonly createdAt!: Date;
   readonly updatedAt!: Date;
@@ -66,6 +88,7 @@ export class UserResponseDto {
     this.siteId = record.siteId;
     this.email = record.email;
     this.fullName = record.fullName;
+    this.role = record.role;
     this.active = record.active;
     this.createdAt = record.createdAt;
     this.updatedAt = record.updatedAt;

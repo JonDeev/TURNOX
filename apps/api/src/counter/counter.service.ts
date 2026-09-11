@@ -8,6 +8,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import {
   CounterListQueryDto,
   CounterResponseDto,
@@ -20,13 +22,16 @@ export class CounterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateCounterDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<CounterResponseDto> {
+    this.authorization.assertSite(context, organizationId, dto.siteId);
     await this.ensureSite(organizationId, dto.siteId);
     if (dto.roomId !== undefined) await this.ensureRoom(organizationId, dto.siteId, dto.roomId);
     try {
@@ -40,6 +45,7 @@ export class CounterService {
           resourceType: 'COUNTER',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -54,11 +60,14 @@ export class CounterService {
   async list(
     organizationId: string,
     query: CounterListQueryDto,
+    context: AuthContext,
   ): Promise<Page<CounterResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
       ...(query.siteId === undefined ? {} : { siteId: query.siteId }),
+      ...this.authorization.siteFilter(context),
       ...(query.active === undefined ? {} : { active: query.active }),
     };
     const { page, pageSize } = paginationOf(query);
@@ -75,8 +84,10 @@ export class CounterService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<CounterResponseDto> {
-    const counter = await this.prisma.counter.findFirst({ where: { id, organizationId } });
+  async get(organizationId: string, id: string, context: AuthContext): Promise<CounterResponseDto> {
+    const counter = await this.prisma.counter.findFirst({
+      where: { id, organizationId, ...this.authorization.siteFilter(context) },
+    });
     if (counter === null) throw new ResourceNotFoundException('Counter');
     return new CounterResponseDto(counter);
   }
@@ -85,9 +96,10 @@ export class CounterService {
     organizationId: string,
     id: string,
     dto: UpdateCounterDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<CounterResponseDto> {
-    const current = await this.get(organizationId, id);
+    const current = await this.get(organizationId, id, context);
     if (dto.roomId !== undefined) await this.ensureRoom(organizationId, current.siteId, dto.roomId);
     try {
       const changedFields = [
@@ -116,6 +128,7 @@ export class CounterService {
           resourceType: 'COUNTER',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

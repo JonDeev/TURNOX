@@ -8,6 +8,10 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import { AuthorizationDeniedException } from '../auth/auth.exceptions.js';
+import type { AuthContext } from '../auth/auth.types.js';
+import { PasswordHasher } from '../auth/password-hasher.js';
 import { CreateUserDto, UpdateUserDto, UserListQueryDto, UserResponseDto } from './dto/user.dto.js';
 
 @Injectable()
@@ -15,15 +19,28 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
+    private readonly hasher: PasswordHasher,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateUserDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<UserResponseDto> {
+    this.authorization.assertOrganization(context, organizationId);
+    if (dto.role === 'SUPERADMINISTRADOR' && context.role !== 'SUPERADMINISTRADOR') {
+      throw new AuthorizationDeniedException();
+    }
     await this.ensureOrganization(organizationId);
-    if (dto.siteId !== undefined) await this.ensureSite(organizationId, dto.siteId);
+    if (dto.siteId !== undefined) {
+      await this.ensureSite(organizationId, dto.siteId);
+      this.authorization.assertSite(context, organizationId, dto.siteId);
+    } else if (context.siteId !== null && dto.role !== 'SUPERADMINISTRADOR') {
+      throw new AuthorizationDeniedException();
+    }
+    const passwordHash = await this.hasher.hash(dto.password);
     try {
       const user = await this.prisma.$transaction(async (tx) => {
         const created = await tx.user.create({
@@ -32,6 +49,8 @@ export class UserService {
             siteId: dto.siteId,
             email: dto.email.trim().toLowerCase(),
             fullName: dto.fullName.trim(),
+            role: dto.role,
+            passwordHash,
           },
         });
         await this.audit.record(tx, {
@@ -40,6 +59,7 @@ export class UserService {
           resourceType: 'USER',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -51,11 +71,17 @@ export class UserService {
     }
   }
 
-  async list(organizationId: string, query: UserListQueryDto): Promise<Page<UserResponseDto>> {
+  async list(
+    organizationId: string,
+    query: UserListQueryDto,
+    context: AuthContext,
+  ): Promise<Page<UserResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
       ...(query.siteId === undefined ? {} : { siteId: query.siteId }),
+      ...this.authorization.siteFilter(context),
       ...(query.active === undefined ? {} : { active: query.active }),
     };
     const { page, pageSize } = paginationOf(query);
@@ -77,8 +103,11 @@ export class UserService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<UserResponseDto> {
-    const user = await this.prisma.user.findFirst({ where: { id, organizationId } });
+  async get(organizationId: string, id: string, context: AuthContext): Promise<UserResponseDto> {
+    this.authorization.assertOrganization(context, organizationId);
+    const user = await this.prisma.user.findFirst({
+      where: { id, organizationId, ...this.authorization.siteFilter(context) },
+    });
     if (user === null) throw new ResourceNotFoundException('User');
     return new UserResponseDto(user);
   }
@@ -87,17 +116,26 @@ export class UserService {
     organizationId: string,
     id: string,
     dto: UpdateUserDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<UserResponseDto> {
-    const current = await this.get(organizationId, id);
-    if (dto.siteId !== undefined && dto.siteId !== null)
+    const current = await this.get(organizationId, id, context);
+    if (dto.role === 'SUPERADMINISTRADOR' && context.role !== 'SUPERADMINISTRADOR') {
+      throw new AuthorizationDeniedException();
+    }
+    if (dto.siteId !== undefined && dto.siteId !== null) {
       await this.ensureSite(organizationId, dto.siteId);
+      this.authorization.assertSite(context, organizationId, dto.siteId);
+    } else if (dto.siteId === null && context.siteId !== null) {
+      throw new AuthorizationDeniedException();
+    }
     try {
       const changedFields = [
         ...(dto.siteId === undefined ? [] : ['siteId']),
         ...(dto.email === undefined ? [] : ['email']),
         ...(dto.fullName === undefined ? [] : ['fullName']),
         ...(dto.active === undefined ? [] : ['active']),
+        ...(dto.role === undefined ? [] : ['role']),
       ];
       const action =
         changedFields.length === 1 && dto.active !== undefined && dto.active !== current.active
@@ -112,6 +150,7 @@ export class UserService {
             ...(dto.email === undefined ? {} : { email: dto.email.trim().toLowerCase() }),
             ...(dto.fullName === undefined ? {} : { fullName: dto.fullName.trim() }),
             ...(dto.active === undefined ? {} : { active: dto.active }),
+            ...(dto.role === undefined ? {} : { role: dto.role }),
           },
           where: { id },
         });
@@ -121,6 +160,7 @@ export class UserService {
           resourceType: 'USER',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

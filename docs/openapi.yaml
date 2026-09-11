@@ -1,0 +1,211 @@
+openapi: 3.0.3
+info:
+  title: TURNOX API
+  version: 0.1.0
+  description: HTTP contract baseline for P1.4 authentication and administration.
+servers:
+  - url: /
+paths:
+  /health/live:
+    get:
+      operationId: healthLive
+      responses:
+        '200':
+          description: Process is alive.
+  /health/ready:
+    get:
+      operationId: healthReady
+      responses:
+        '200':
+          description: Dependencies are ready.
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /auth/csrf:
+    get:
+      operationId: issueCsrfCookie
+      responses:
+        '200':
+          description: CSRF cookie issued.
+  /auth/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated session.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '429':
+          $ref: '#/components/responses/AuthRateLimited'
+  /auth/logout:
+    post:
+      operationId: logout
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: Session revoked and cookies expired.
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+  /auth/me:
+    get:
+      operationId: currentSession
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Public authenticated identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionResponse'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+  /organizations/{organizationId}/sites:
+    get:
+      operationId: listSites
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Scoped site page.
+    post:
+      operationId: createSite
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '201':
+          description: Site created.
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: turnox_session
+  parameters:
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: '^[a-f0-9]{64}$'
+  schemas:
+    LoginRequest:
+      type: object
+      required: [organizationId, email, password]
+      additionalProperties: false
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 256
+    AuthSessionResponse:
+      type: object
+      required: [user, expiresAt]
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/PublicAuthenticatedUser'
+    PublicAuthenticatedUser:
+      type: object
+      required: [id, organizationId, email, fullName, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        siteId:
+          type: string
+          format: uuid
+          nullable: true
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [SUPERADMINISTRADOR, ADMINISTRADOR, SUPERVISOR, ASESOR]
+    ApiError:
+      type: object
+      required: [statusCode, code, message, correlationId, timestamp]
+      properties:
+        statusCode:
+          type: integer
+        code:
+          type: string
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        correlationId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+  responses:
+    AuthenticationRequired:
+      description: Authentication required.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    InvalidCredentials:
+      description: Credentials rejected uniformly.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    AuthorizationDenied:
+      description: Authorization or CSRF validation failed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    AuthRateLimited:
+      description: Authentication attempts limited.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    DatabaseUnavailable:
+      description: PostgreSQL is unavailable.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }

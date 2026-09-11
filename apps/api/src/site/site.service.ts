@@ -8,6 +8,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import { CreateSiteDto, SiteListQueryDto, SiteResponseDto, UpdateSiteDto } from './dto/site.dto.js';
 
 @Injectable()
@@ -15,13 +17,16 @@ export class SiteService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateSiteDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<SiteResponseDto> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     try {
       const site = await this.prisma.$transaction(async (tx) => {
@@ -34,6 +39,7 @@ export class SiteService {
           resourceType: 'SITE',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -45,10 +51,18 @@ export class SiteService {
     }
   }
 
-  async list(organizationId: string, query: SiteListQueryDto): Promise<Page<SiteResponseDto>> {
+  async list(
+    organizationId: string,
+    query: SiteListQueryDto,
+    context: AuthContext,
+  ): Promise<Page<SiteResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
+      ...(context.siteId === null || context.role === 'SUPERADMINISTRADOR'
+        ? {}
+        : { id: context.siteId }),
       ...(query.active === undefined ? {} : { active: query.active }),
     };
     const { page, pageSize } = paginationOf(query);
@@ -65,7 +79,8 @@ export class SiteService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<SiteResponseDto> {
+  async get(organizationId: string, id: string, context: AuthContext): Promise<SiteResponseDto> {
+    this.authorization.assertSite(context, organizationId, id);
     const site = await this.prisma.site.findFirst({ where: { id, organizationId } });
     if (site === null) throw new ResourceNotFoundException('Site');
     return new SiteResponseDto(site);
@@ -75,9 +90,10 @@ export class SiteService {
     organizationId: string,
     id: string,
     dto: UpdateSiteDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<SiteResponseDto> {
-    const current = await this.get(organizationId, id);
+    const current = await this.get(organizationId, id, context);
     try {
       const changedFields = [
         ...(dto.name === undefined ? [] : ['name']),
@@ -103,6 +119,7 @@ export class SiteService {
           resourceType: 'SITE',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

@@ -5,6 +5,8 @@ import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { ResourceNotFoundException } from '../common/resource.exceptions.js';
 import { pageOf, paginationOf, type Page } from '../common/pagination.dto.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import {
   CreateOrganizationDto,
   OrganizationListQueryDto,
@@ -17,10 +19,12 @@ export class OrganizationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     dto: CreateOrganizationDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<OrganizationResponseDto> {
     try {
@@ -33,6 +37,7 @@ export class OrganizationService {
           resourceType: 'ORGANIZATION',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -66,7 +71,8 @@ export class OrganizationService {
     );
   }
 
-  async get(id: string): Promise<OrganizationResponseDto> {
+  async get(id: string, context: AuthContext): Promise<OrganizationResponseDto> {
+    this.authorization.assertOrganization(context, id);
     const organization = await this.prisma.organization.findUnique({ where: { id } });
     if (organization === null) {
       throw new ResourceNotFoundException('Organization');
@@ -77,8 +83,10 @@ export class OrganizationService {
   async update(
     id: string,
     dto: UpdateOrganizationDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<OrganizationResponseDto> {
+    this.authorization.assertOrganization(context, id);
     const current = await this.prisma.organization.findUnique({ where: { id } });
     if (current === null) {
       throw new ResourceNotFoundException('Organization');
@@ -108,6 +116,7 @@ export class OrganizationService {
           resourceType: 'ORGANIZATION',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

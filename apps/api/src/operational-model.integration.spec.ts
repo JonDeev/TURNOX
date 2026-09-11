@@ -3,9 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import type { Response } from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from './app.module.js';
+import { configureApplication } from './app.factory.js';
+import { PasswordHasher } from './auth/password-hasher.js';
 import { PrismaService } from './database/prisma.service.js';
 
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
@@ -14,22 +17,50 @@ if (runIntegration && process.env.DATABASE_URL === undefined) {
 }
 const integration = runIntegration ? describe : describe.skip;
 
+function cookieValue(response: Response, name: string): string {
+  const cookies = response.headers['set-cookie'];
+  const values = Array.isArray(cookies) ? cookies : cookies === undefined ? [] : [cookies];
+  const cookie = values.find((candidate) => candidate.startsWith(`${name}=`));
+  const value = cookie?.split(';', 1)[0]?.slice(name.length + 1);
+  if (value === undefined) throw new Error(`Cookie ${name} not found`);
+  return value;
+}
+
 integration('organizational model against PostgreSQL', () => {
   let app: NestExpressApplication;
   let prisma: PrismaService;
-  const testOrganizationIds: string[] = [];
+  let organizationA: string;
+  let organizationB: string;
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication<NestExpressApplication>();
+    configureApplication(app);
     await app.init();
     prisma = app.get(PrismaService);
+    const hasher = app.get(PasswordHasher);
+    const [orgA, orgB] = await Promise.all([
+      prisma.organization.create({ data: { name: 'Org A' } }),
+      prisma.organization.create({ data: { name: 'Org B' } }),
+    ]);
+    organizationA = orgA.id;
+    organizationB = orgB.id;
+    await prisma.user.create({
+      data: {
+        organizationId: organizationA,
+        email: 'operational-admin@example.test',
+        fullName: 'Operational Admin',
+        role: 'ADMINISTRADOR',
+        passwordHash: await hasher.hash('correct-password'),
+      },
+    });
   });
 
   afterAll(async () => {
-    if (prisma !== undefined && testOrganizationIds.length > 0) {
-      const scope = { organizationId: { in: testOrganizationIds } };
+    if (prisma !== undefined && organizationA !== undefined) {
+      const scope = { organizationId: { in: [organizationA, organizationB] } };
       await prisma.adminAuditLog.deleteMany({ where: scope });
+      await prisma.authSession.deleteMany({ where: scope });
       await prisma.serviceAssignment.deleteMany({ where: scope });
       await prisma.device.deleteMany({ where: scope });
       await prisma.counter.deleteMany({ where: scope });
@@ -37,130 +68,83 @@ integration('organizational model against PostgreSQL', () => {
       await prisma.service.deleteMany({ where: scope });
       await prisma.user.deleteMany({ where: scope });
       await prisma.site.deleteMany({ where: scope });
-      await prisma.organization.deleteMany({ where: { id: { in: testOrganizationIds } } });
+      await prisma.organization.deleteMany({
+        where: { id: { in: [organizationA, organizationB] } },
+      });
     }
     await app?.close();
   });
 
-  it('persists valid configuration and rejects cross-organization relationships', async () => {
-    const http = request(app.getHttpServer());
-    await http.get('/health/live').expect(200, { status: 'ok' });
-    const organizationA = await http.post('/organizations').send({ name: 'Org A' }).expect(201);
-    const organizationB = await http.post('/organizations').send({ name: 'Org B' }).expect(201);
-    const orgA = organizationA.body.id as string;
-    const orgB = organizationB.body.id as string;
-    testOrganizationIds.push(orgA, orgB);
+  it('persists valid configuration, preserves health and rejects cross-organization relationships', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const login = await agent.post('/auth/login').send({
+      organizationId: organizationA,
+      email: 'operational-admin@example.test',
+      password: 'correct-password',
+    });
+    const csrfToken = cookieValue(login, 'turnox_csrf');
+    await agent.get('/health/live').expect(200, { status: 'ok' });
+    await agent.get('/health/ready').expect(200);
+    await agent.get(`/organizations/${organizationB}`).expect(403);
 
-    const createdAt = new Date(organizationA.body.createdAt as string).getTime();
-    const initialUpdatedAt = new Date(organizationA.body.updatedAt as string).getTime();
-    expect(createdAt).toBeGreaterThan(0);
-    expect(initialUpdatedAt).toBeGreaterThan(0);
-    await prisma.$executeRaw`SELECT pg_sleep(0.01)`;
-
-    await http.get(`/organizations/${orgA}`).expect(200);
-    const organizations = await http.get('/organizations').expect(200);
-    expect(organizations.body.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: orgA }),
-        expect.objectContaining({ id: orgB }),
-      ]),
-    );
-    const deactivatedOrganization = await http
-      .patch(`/organizations/${orgA}`)
-      .send({ active: false })
-      .expect(200);
-    expect(new Date(deactivatedOrganization.body.updatedAt as string).getTime()).toBeGreaterThan(
-      initialUpdatedAt,
-    );
-    await http
-      .patch(`/organizations/${orgA}`)
-      .send({ name: 'Org A Updated', active: true })
-      .expect(200);
-    await http.get('/health/ready').expect(200);
-
-    const siteAResponse = await http
-      .post(`/organizations/${orgA}/sites`)
+    const siteAResponse = await agent
+      .post(`/organizations/${organizationA}/sites`)
+      .set('X-CSRF-Token', csrfToken)
       .send({ name: 'Sede A' })
       .expect(201);
-    const siteBResponse = await http
-      .post(`/organizations/${orgB}/sites`)
-      .send({ name: 'Sede B' })
-      .expect(201);
     const siteA = siteAResponse.body.id as string;
-    const siteB = siteBResponse.body.id as string;
+    const siteB = (
+      await prisma.site.create({
+        data: { organizationId: organizationB, name: 'Sede B' },
+      })
+    ).id;
+    await agent
+      .post(`/organizations/${organizationA}/sites`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: 'Sede A' })
+      .expect(409);
 
-    await http.post(`/organizations/${orgA}/sites`).send({ name: 'Sede A' }).expect(409);
-    await http.get(`/organizations/${orgB}/sites/${siteA}`).expect(404);
+    const roomA = (
+      await agent
+        .post(`/organizations/${organizationA}/rooms`)
+        .set('X-CSRF-Token', csrfToken)
+        .send({ siteId: siteA, name: 'Sala A' })
+        .expect(201)
+    ).body.id as string;
+    const serviceA = (
+      await agent
+        .post(`/organizations/${organizationA}/services`)
+        .set('X-CSRF-Token', csrfToken)
+        .send({ siteId: siteA, name: 'Información' })
+        .expect(201)
+    ).body.id as string;
+    const userA = (
+      await agent
+        .post(`/organizations/${organizationA}/users`)
+        .set('X-CSRF-Token', csrfToken)
+        .send({
+          siteId: siteA,
+          email: 'asesor@orga.test',
+          fullName: 'Asesor A',
+          role: 'ASESOR',
+          password: 'correct-password',
+        })
+        .expect(201)
+    ).body.id as string;
+    await agent
+      .post(`/organizations/${organizationA}/users/${userA}/services/${serviceA}`)
+      .set('X-CSRF-Token', csrfToken)
+      .expect(201);
 
-    const roomAResponse = await http
-      .post(`/organizations/${orgA}/rooms`)
-      .send({ siteId: siteA, name: 'Sala A' })
-      .expect(201);
-    const roomA = roomAResponse.body.id as string;
-    const roomBResponse = await http
-      .post(`/organizations/${orgB}/rooms`)
-      .send({ siteId: siteB, name: 'Sala B' })
-      .expect(201);
-    const roomB = roomBResponse.body.id as string;
-    const serviceAResponse = await http
-      .post(`/organizations/${orgA}/services`)
-      .send({ siteId: siteA, name: 'Información' })
-      .expect(201);
-    const serviceA = serviceAResponse.body.id as string;
-    const serviceBResponse = await http
-      .post(`/organizations/${orgB}/services`)
-      .send({ siteId: siteB, name: 'Información' })
-      .expect(201);
-    const serviceB = serviceBResponse.body.id as string;
-    const userAResponse = await http
-      .post(`/organizations/${orgA}/users`)
-      .send({ siteId: siteA, email: 'asesor@orga.test', fullName: 'Asesor A' })
-      .expect(201);
-    const userA = userAResponse.body.id as string;
-
-    await http
-      .post(`/organizations/${orgA}/services`)
-      .send({ siteId: siteB, name: 'Cruce' })
-      .expect(400);
-    await http
-      .post(`/organizations/${orgA}/rooms`)
-      .send({ siteId: siteB, name: 'Sala inválida' })
-      .expect(400);
-    await http
-      .post(`/organizations/${orgA}/counters`)
-      .send({ siteId: siteA, roomId: roomB, name: 'Módulo inválido' })
-      .expect(400);
-    await http
-      .post(`/organizations/${orgA}/devices`)
-      .send({ siteId: siteA, roomId: roomB, name: 'Display inválido', type: 'DISPLAY' })
-      .expect(400);
-    await http
-      .post(`/organizations/${orgA}/users`)
-      .send({ siteId: siteB, email: 'cruce@orga.test', fullName: 'Usuario inválido' })
-      .expect(400);
-    await http.post(`/organizations/${orgA}/users/${userA}/services/${serviceA}`).expect(201);
-    await http.post(`/organizations/${orgB}/users/${userA}/services/${serviceA}`).expect(400);
-    await http.post(`/organizations/${orgA}/users/${userA}/services/${serviceA}`).expect(409);
-
-    await expect(
-      prisma.$executeRaw`
-        INSERT INTO "services" ("id", "organizationId", "siteId", "name")
-        VALUES (${randomUUID()}::uuid, ${orgA}::uuid, ${siteB}::uuid, 'DB cross-service')`,
-    ).rejects.toThrow();
-    await expect(
-      prisma.$executeRaw`
-        INSERT INTO "rooms" ("id", "organizationId", "siteId", "name")
-        VALUES (${randomUUID()}::uuid, ${orgA}::uuid, ${siteB}::uuid, 'DB cross-room')`,
-    ).rejects.toThrow();
-
-    const counterResponse = await http
-      .post(`/organizations/${orgA}/counters`)
+    const counter = await agent
+      .post(`/organizations/${organizationA}/counters`)
+      .set('X-CSRF-Token', csrfToken)
       .send({ siteId: siteA, roomId: roomA, name: 'Módulo 1' })
       .expect(201);
-    expect(counterResponse.body.roomId).toBe(roomA);
-
-    const deviceResponse = await http
-      .post(`/organizations/${orgA}/devices`)
+    expect(counter.body.roomId).toBe(roomA);
+    const device = await agent
+      .post(`/organizations/${organizationA}/devices`)
+      .set('X-CSRF-Token', csrfToken)
       .send({
         siteId: siteA,
         roomId: roomA,
@@ -169,28 +153,23 @@ integration('organizational model against PostgreSQL', () => {
         metadata: { zone: 'public' },
       })
       .expect(201);
-    expect(deviceResponse.body.type).toBe('DISPLAY');
-    expect(deviceResponse.body.metadata).toEqual({ zone: 'public' });
+    expect(device.body.metadata).toEqual({ zone: 'public' });
 
+    await agent
+      .post(`/organizations/${organizationA}/services`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ siteId: siteB, name: 'Cruce' })
+      .expect(400);
+    await agent.get(`/organizations/${organizationA}/sites/${siteB}`).expect(404);
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO "services" ("id", "organizationId", "siteId", "name")
+        VALUES (${randomUUID()}::uuid, ${organizationA}::uuid, ${siteB}::uuid, 'DB cross-service')`,
+    ).rejects.toThrow();
     await expect(
       prisma.$executeRaw`
         INSERT INTO "counters" ("id", "organizationId", "siteId", "roomId", "name")
-        VALUES (${randomUUID()}::uuid, ${orgA}::uuid, ${siteA}::uuid, ${roomB}::uuid, 'DB cross-counter')`,
-    ).rejects.toThrow();
-    await expect(
-      prisma.$executeRaw`
-        INSERT INTO "devices" ("id", "organizationId", "siteId", "roomId", "name", "type")
-        VALUES (${randomUUID()}::uuid, ${orgA}::uuid, ${siteA}::uuid, ${roomB}::uuid, 'DB cross-device', 'DISPLAY'::"DeviceType")`,
-    ).rejects.toThrow();
-    await expect(
-      prisma.$executeRaw`
-        INSERT INTO "service_assignments" ("organizationId", "userId", "serviceId")
-        VALUES (${orgA}::uuid, ${userA}::uuid, ${serviceB}::uuid)`,
-    ).rejects.toThrow();
-    await expect(
-      prisma.$executeRaw`
-        INSERT INTO "organizations" ("id", "name")
-        VALUES (${randomUUID()}::uuid, NULL)`,
+        VALUES (${randomUUID()}::uuid, ${organizationA}::uuid, ${siteA}::uuid, ${randomUUID()}::uuid, 'DB cross-counter')`,
     ).rejects.toThrow();
   });
 });

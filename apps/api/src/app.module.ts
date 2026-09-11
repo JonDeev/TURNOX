@@ -15,6 +15,7 @@ import { UserModule } from './user/user.module.js';
 import { ServiceAssignmentModule } from './service-assignment/service-assignment.module.js';
 import { DeviceModule } from './device/device.module.js';
 import { AuditModule } from './audit/audit.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AuditModule } from './audit/audit.module.js';
     HealthModule,
     DatabaseModule,
     AuditModule,
+    AuthModule,
     OrganizationModule,
     SiteModule,
     ServiceModule,

@@ -21,6 +21,7 @@ export interface AdminAuditEntry {
   readonly resourceId: string;
   readonly action: AdminAuditAction;
   readonly correlationId?: string;
+  readonly actorUserId?: string | null;
   readonly metadata?: Prisma.InputJsonObject;
 }
 
@@ -40,8 +41,11 @@ export class AdminAuditService {
         resourceType: entry.resourceType,
         resourceId: entry.resourceId,
         action: entry.action,
-        actorUserId: null,
-        actorType: 'UNAUTHENTICATED',
+        actorUserId: entry.actorUserId ?? null,
+        actorType:
+          entry.actorUserId === undefined || entry.actorUserId === null
+            ? 'UNAUTHENTICATED'
+            : 'USER',
         correlationId: entry.correlationId ?? null,
         metadata: entry.metadata ?? {},
       },

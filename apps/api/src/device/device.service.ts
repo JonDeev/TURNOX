@@ -8,6 +8,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import {
   CreateDeviceDto,
   DeviceListQueryDto,
@@ -20,13 +22,16 @@ export class DeviceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateDeviceDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<DeviceResponseDto> {
+    this.authorization.assertSite(context, organizationId, dto.siteId);
     await this.ensureSite(organizationId, dto.siteId);
     if (dto.roomId !== undefined) await this.ensureRoom(organizationId, dto.siteId, dto.roomId);
     try {
@@ -47,6 +52,7 @@ export class DeviceService {
           resourceType: 'DEVICE',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -58,11 +64,17 @@ export class DeviceService {
     }
   }
 
-  async list(organizationId: string, query: DeviceListQueryDto): Promise<Page<DeviceResponseDto>> {
+  async list(
+    organizationId: string,
+    query: DeviceListQueryDto,
+    context: AuthContext,
+  ): Promise<Page<DeviceResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
       ...(query.siteId === undefined ? {} : { siteId: query.siteId }),
+      ...this.authorization.siteFilter(context),
       ...(query.type === undefined ? {} : { type: query.type }),
       ...(query.enabled === undefined ? {} : { enabled: query.enabled }),
     };
@@ -80,8 +92,10 @@ export class DeviceService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<DeviceResponseDto> {
-    const device = await this.prisma.device.findFirst({ where: { id, organizationId } });
+  async get(organizationId: string, id: string, context: AuthContext): Promise<DeviceResponseDto> {
+    const device = await this.prisma.device.findFirst({
+      where: { id, organizationId, ...this.authorization.siteFilter(context) },
+    });
     if (device === null) throw new ResourceNotFoundException('Device');
     return new DeviceResponseDto(device);
   }
@@ -90,9 +104,10 @@ export class DeviceService {
     organizationId: string,
     id: string,
     dto: UpdateDeviceDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<DeviceResponseDto> {
-    const current = await this.get(organizationId, id);
+    const current = await this.get(organizationId, id, context);
     if (dto.roomId !== undefined && dto.roomId !== null)
       await this.ensureRoom(organizationId, current.siteId, dto.roomId);
     try {
@@ -126,6 +141,7 @@ export class DeviceService {
           resourceType: 'DEVICE',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

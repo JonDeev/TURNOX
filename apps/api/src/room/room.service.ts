@@ -8,6 +8,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import { CreateRoomDto, RoomListQueryDto, RoomResponseDto, UpdateRoomDto } from './dto/room.dto.js';
 
 @Injectable()
@@ -15,13 +17,16 @@ export class RoomService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateRoomDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<RoomResponseDto> {
+    this.authorization.assertSite(context, organizationId, dto.siteId);
     await this.ensureSite(organizationId, dto.siteId);
     try {
       const room = await this.prisma.$transaction(async (tx) => {
@@ -34,6 +39,7 @@ export class RoomService {
           resourceType: 'ROOM',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -45,11 +51,17 @@ export class RoomService {
     }
   }
 
-  async list(organizationId: string, query: RoomListQueryDto): Promise<Page<RoomResponseDto>> {
+  async list(
+    organizationId: string,
+    query: RoomListQueryDto,
+    context: AuthContext,
+  ): Promise<Page<RoomResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
       ...(query.siteId === undefined ? {} : { siteId: query.siteId }),
+      ...this.authorization.siteFilter(context),
       ...(query.active === undefined ? {} : { active: query.active }),
     };
     const { page, pageSize } = paginationOf(query);
@@ -66,8 +78,10 @@ export class RoomService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<RoomResponseDto> {
-    const room = await this.prisma.room.findFirst({ where: { id, organizationId } });
+  async get(organizationId: string, id: string, context: AuthContext): Promise<RoomResponseDto> {
+    const room = await this.prisma.room.findFirst({
+      where: { id, organizationId, ...this.authorization.siteFilter(context) },
+    });
     if (room === null) throw new ResourceNotFoundException('Room');
     return new RoomResponseDto(room);
   }
@@ -76,9 +90,10 @@ export class RoomService {
     organizationId: string,
     id: string,
     dto: UpdateRoomDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<RoomResponseDto> {
-    const current = await this.get(organizationId, id);
+    const current = await this.get(organizationId, id, context);
     try {
       const changedFields = [
         ...(dto.name === undefined ? [] : ['name']),
@@ -104,6 +119,7 @@ export class RoomService {
           resourceType: 'ROOM',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

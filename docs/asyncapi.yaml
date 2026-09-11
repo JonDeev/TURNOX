@@ -1,0 +1,32 @@
+asyncapi: 3.1.0
+info:
+  title: TURNOX event contract baseline
+  version: 0.1.0
+  description: Versioned envelope reserved for future realtime modules.
+defaultContentType: application/json
+channels: {}
+components:
+  schemas:
+    EventEnvelope:
+      type: object
+      additionalProperties: false
+      required: [schema_version, event_id, occurred_at, scope, payload]
+      properties:
+        schema_version:
+          type: string
+          description: Contract version, independent from transport delivery.
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        scope:
+          type: object
+          additionalProperties: false
+          required: [organization_id]
+          properties:
+            organization_id: { type: string, format: uuid }
+            site_id: { type: string, format: uuid, nullable: true }
+        payload:
+          type: object
+          additionalProperties: true

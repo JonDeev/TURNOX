@@ -7,6 +7,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import { ServiceAssignmentResponseDto } from './dto/service-assignment.dto.js';
 
 @Injectable()
@@ -14,16 +16,24 @@ export class ServiceAssignmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async listForUser(
     organizationId: string,
     userId: string,
+    context: AuthContext,
   ): Promise<readonly ServiceAssignmentResponseDto[]> {
-    await this.ensureUser(organizationId, userId);
+    await this.ensureUser(organizationId, userId, context);
     const assignments = await this.prisma.serviceAssignment.findMany({
       orderBy: { createdAt: 'asc' },
-      where: { organizationId, userId },
+      where: {
+        organizationId,
+        userId,
+        ...(context.siteId === null || context.role === 'SUPERADMINISTRADOR'
+          ? {}
+          : { service: { siteId: context.siteId } }),
+      },
     });
     return assignments.map((assignment) => new ServiceAssignmentResponseDto(assignment));
   }
@@ -32,10 +42,11 @@ export class ServiceAssignmentService {
     organizationId: string,
     userId: string,
     serviceId: string,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<ServiceAssignmentResponseDto> {
-    await this.ensureUser(organizationId, userId);
-    await this.ensureService(organizationId, serviceId);
+    await this.ensureUser(organizationId, userId, context);
+    await this.ensureService(organizationId, serviceId, context);
     try {
       const assignment = await this.prisma.$transaction(async (tx) => {
         const created = await tx.serviceAssignment.create({
@@ -51,6 +62,7 @@ export class ServiceAssignmentService {
           resourceType: 'SERVICE_ASSIGNMENT',
           resourceId: `${userId}:${serviceId}`,
           action: 'ASSIGN',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(['userId', 'serviceId']),
         });
@@ -66,8 +78,10 @@ export class ServiceAssignmentService {
     organizationId: string,
     userId: string,
     serviceId: string,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<void> {
+    await this.ensureUser(organizationId, userId, context);
     try {
       await this.prisma.$transaction(async (tx) => {
         const service = await tx.service.findFirst({
@@ -75,6 +89,7 @@ export class ServiceAssignmentService {
           select: { siteId: true },
         });
         if (service === null) throw new ResourceNotFoundException('Service assignment');
+        this.authorization.assertSite(context, organizationId, service.siteId);
 
         const deleted = await tx.serviceAssignment.deleteMany({
           where: { organizationId, userId, serviceId },
@@ -87,6 +102,7 @@ export class ServiceAssignmentService {
           resourceType: 'SERVICE_ASSIGNMENT',
           resourceId: `${userId}:${serviceId}`,
           action: 'UNASSIGN',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(['userId', 'serviceId']),
         });
@@ -97,21 +113,36 @@ export class ServiceAssignmentService {
     }
   }
 
-  private async ensureUser(organizationId: string, userId: string): Promise<void> {
+  private async ensureUser(
+    organizationId: string,
+    userId: string,
+    context: AuthContext,
+  ): Promise<void> {
+    this.authorization.assertOrganization(context, organizationId);
     const user = await this.prisma.user.findFirst({
-      where: { id: userId, organizationId },
+      where: { id: userId, organizationId, ...this.authorization.siteFilter(context) },
       select: { id: true },
     });
     if (user === null)
       throw new InvalidRelationshipException('User does not belong to the organization');
   }
 
-  private async ensureService(organizationId: string, serviceId: string): Promise<void> {
+  private async ensureService(
+    organizationId: string,
+    serviceId: string,
+    context: AuthContext,
+  ): Promise<void> {
     const service = await this.prisma.service.findFirst({
       where: { id: serviceId, organizationId },
       select: { id: true },
     });
     if (service === null)
       throw new InvalidRelationshipException('Service does not belong to the organization');
+    const scopedService = await this.prisma.service.findFirst({
+      where: { id: serviceId, organizationId, ...this.authorization.siteFilter(context) },
+      select: { id: true },
+    });
+    if (scopedService === null)
+      throw new InvalidRelationshipException('Service is outside the site scope');
   }
 }

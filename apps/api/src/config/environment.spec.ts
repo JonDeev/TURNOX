@@ -16,6 +16,10 @@ describe('API environment configuration', () => {
     });
 
     expect(configuration).toEqual({
+      authCookieName: 'turnox_session',
+      authCookiePath: '/',
+      authCookieSameSite: 'lax',
+      authCookieSecure: true,
       bodyLimit: '2mb',
       databaseUrl: 'postgresql://turnox:secret@localhost:5432/turnox',
       corsOrigins: ['https://console.example.test', 'https://kiosk.example.test'],
@@ -23,6 +27,8 @@ describe('API environment configuration', () => {
       logLevel: 'debug',
       nodeEnv: 'production',
       port: 8080,
+      csrfCookieName: 'turnox_csrf',
+      sessionTtlSeconds: 28800,
       trustProxy: true,
     });
   });

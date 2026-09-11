@@ -8,6 +8,8 @@ import {
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
+import { AuthorizationService } from '../auth/authorization.service.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import {
   CreateServiceDto,
   ServiceListQueryDto,
@@ -20,13 +22,16 @@ export class ServiceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AdminAuditService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   async create(
     organizationId: string,
     dto: CreateServiceDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<ServiceResponseDto> {
+    this.authorization.assertSite(context, organizationId, dto.siteId);
     await this.ensureSite(organizationId, dto.siteId);
     try {
       const service = await this.prisma.$transaction(async (tx) => {
@@ -39,6 +44,7 @@ export class ServiceService {
           resourceType: 'SERVICE',
           resourceId: created.id,
           action: 'CREATE',
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(),
         });
@@ -53,11 +59,14 @@ export class ServiceService {
   async list(
     organizationId: string,
     query: ServiceListQueryDto,
+    context: AuthContext,
   ): Promise<Page<ServiceResponseDto>> {
+    this.authorization.assertOrganization(context, organizationId);
     await this.ensureOrganization(organizationId);
     const where = {
       organizationId,
       ...(query.siteId === undefined ? {} : { siteId: query.siteId }),
+      ...this.authorization.siteFilter(context),
       ...(query.active === undefined ? {} : { active: query.active }),
     };
     const { page, pageSize } = paginationOf(query);
@@ -74,8 +83,10 @@ export class ServiceService {
     );
   }
 
-  async get(organizationId: string, id: string): Promise<ServiceResponseDto> {
-    const service = await this.prisma.service.findFirst({ where: { id, organizationId } });
+  async get(organizationId: string, id: string, context: AuthContext): Promise<ServiceResponseDto> {
+    const service = await this.prisma.service.findFirst({
+      where: { id, organizationId, ...this.authorization.siteFilter(context) },
+    });
     if (service === null) throw new ResourceNotFoundException('Service');
     return new ServiceResponseDto(service);
   }
@@ -84,10 +95,14 @@ export class ServiceService {
     organizationId: string,
     id: string,
     dto: UpdateServiceDto,
+    context: AuthContext,
     correlationId?: string,
   ): Promise<ServiceResponseDto> {
-    const current = await this.get(organizationId, id);
-    if (dto.siteId !== undefined) await this.ensureSite(organizationId, dto.siteId);
+    const current = await this.get(organizationId, id, context);
+    if (dto.siteId !== undefined) {
+      await this.ensureSite(organizationId, dto.siteId);
+      this.authorization.assertSite(context, organizationId, dto.siteId);
+    }
     try {
       const changedFields = [
         ...(dto.siteId === undefined ? [] : ['siteId']),
@@ -115,6 +130,7 @@ export class ServiceService {
           resourceType: 'SERVICE',
           resourceId: updated.id,
           action,
+          actorUserId: context.userId,
           correlationId,
           metadata: auditMetadata(changedFields),
         });

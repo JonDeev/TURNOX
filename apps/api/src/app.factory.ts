@@ -46,7 +46,8 @@ export function configureApplication(app: NestExpressApplication): void {
 
   httpServer.disable('x-powered-by');
   app.enableCors({
-    allowedHeaders: ['Accept', 'Content-Type', CORRELATION_ID_HEADER],
+    allowedHeaders: ['Accept', 'Content-Type', 'X-CSRF-Token', CORRELATION_ID_HEADER],
+    credentials: true,
     exposedHeaders: [CORRELATION_ID_HEADER],
     methods: ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT'],
     origin: [...configuration.corsOrigins],

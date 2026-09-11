@@ -1,19 +1,26 @@
 import {
   LOG_LEVEL_VALUES,
   NODE_ENV_VALUES,
+  COOKIE_SAME_SITE_VALUES,
   type AppConfiguration,
+  type CookieSameSite,
   type LogLevel,
   type NodeEnvironment,
 } from './configuration.types.js';
 
 const DEFAULT_CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
 const DEFAULTS = {
+  authCookieName: 'turnox_session',
+  authCookiePath: '/',
+  authCookieSameSite: 'lax',
+  csrfCookieName: 'turnox_csrf',
   bodyLimit: '1mb',
   host: '127.0.0.1',
   logLevel: 'info',
   nodeEnv: 'development',
   port: 3000,
   trustProxy: false,
+  sessionTtlSeconds: 28_800,
 } as const;
 
 function getOptionalString(input: Record<string, unknown>, key: string): string | undefined {
@@ -117,6 +124,47 @@ function parseBoolean(value: string | undefined, key: string, defaultValue: bool
   return candidate === 'true';
 }
 
+function parsePositiveInteger(
+  value: string | undefined,
+  key: string,
+  defaultValue: number,
+): number {
+  const candidate = Number(value ?? defaultValue);
+  if (!Number.isInteger(candidate) || candidate < 1 || candidate > 31_536_000) {
+    throw new Error(`${key} must be a positive integer within a safe range`);
+  }
+  return candidate;
+}
+
+function parseCookieSameSite(value: string | undefined): CookieSameSite {
+  const candidate = value ?? DEFAULTS.authCookieSameSite;
+  if (!COOKIE_SAME_SITE_VALUES.includes(candidate as CookieSameSite)) {
+    throw new Error(`AUTH_COOKIE_SAME_SITE must be one of: ${COOKIE_SAME_SITE_VALUES.join(', ')}`);
+  }
+  if (candidate === 'none') {
+    throw new Error(
+      'AUTH_COOKIE_SAME_SITE=none is not permitted without an explicit cross-site security design',
+    );
+  }
+  return candidate as CookieSameSite;
+}
+
+function parseAuthCookieSecure(value: string | undefined, nodeEnv: NodeEnvironment): boolean {
+  const secure = parseBoolean(value, 'AUTH_COOKIE_SECURE', nodeEnv === 'production');
+  if (nodeEnv === 'production' && !secure) {
+    throw new Error('AUTH_COOKIE_SECURE must be true in production');
+  }
+  return secure;
+}
+
+function parseCookieName(value: string | undefined, key: string, fallback: string): string {
+  const candidate = value ?? fallback;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(candidate)) {
+    throw new Error(`${key} must be a simple cookie name`);
+  }
+  return candidate;
+}
+
 function parseCorsOrigins(value: string | undefined, nodeEnv: NodeEnvironment): readonly string[] {
   if (value === undefined) {
     if (nodeEnv === 'production') {
@@ -165,6 +213,22 @@ export function parseAppConfiguration(input: Record<string, unknown>): AppConfig
   const corsOrigins = parseCorsOrigins(getOptionalString(input, 'CORS_ORIGINS'), nodeEnv);
 
   return {
+    authCookieName: parseCookieName(
+      getOptionalString(input, 'AUTH_COOKIE_NAME'),
+      'AUTH_COOKIE_NAME',
+      DEFAULTS.authCookieName,
+    ),
+    csrfCookieName: parseCookieName(
+      getOptionalString(input, 'CSRF_COOKIE_NAME'),
+      'CSRF_COOKIE_NAME',
+      DEFAULTS.csrfCookieName,
+    ),
+    authCookiePath: DEFAULTS.authCookiePath,
+    authCookieSecure: parseAuthCookieSecure(
+      getOptionalString(input, 'AUTH_COOKIE_SECURE'),
+      nodeEnv,
+    ),
+    authCookieSameSite: parseCookieSameSite(getOptionalString(input, 'AUTH_COOKIE_SAME_SITE')),
     databaseUrl: parseDatabaseUrl(input, nodeEnv),
     nodeEnv,
     port: parsePort(getOptionalString(input, 'PORT')),
@@ -176,6 +240,11 @@ export function parseAppConfiguration(input: Record<string, unknown>): AppConfig
       getOptionalString(input, 'TRUST_PROXY'),
       'TRUST_PROXY',
       DEFAULTS.trustProxy,
+    ),
+    sessionTtlSeconds: parsePositiveInteger(
+      getOptionalString(input, 'SESSION_TTL_SECONDS'),
+      'SESSION_TTL_SECONDS',
+      DEFAULTS.sessionTtlSeconds,
     ),
   };
 }
@@ -192,5 +261,10 @@ export function validateEnvironment(input: Record<string, unknown>): Record<stri
     CORS_ORIGINS: configuration.corsOrigins.join(','),
     BODY_LIMIT: configuration.bodyLimit,
     TRUST_PROXY: String(configuration.trustProxy),
+    AUTH_COOKIE_NAME: configuration.authCookieName,
+    CSRF_COOKIE_NAME: configuration.csrfCookieName,
+    AUTH_COOKIE_SECURE: String(configuration.authCookieSecure),
+    AUTH_COOKIE_SAME_SITE: configuration.authCookieSameSite,
+    SESSION_TTL_SECONDS: String(configuration.sessionTtlSeconds),
   };
 }
