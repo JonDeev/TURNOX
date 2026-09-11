@@ -49,3 +49,24 @@ pnpm --filter @turnox/print-agent dev
 
 Console usa el puerto `5173` y Kiosk el `5174`. El Print Agent queda en
 typecheck/watch hasta que se implemente su integración.
+
+## PostgreSQL local
+
+La base local es opcional para el resto del monorepo y reproducible con Docker:
+
+```bash
+docker compose -f infra/dev/compose.yaml up -d
+cp apps/api/.env.example apps/api/.env
+pnpm --filter @turnox/api db:migrate
+pnpm --filter @turnox/api db:generate
+```
+
+El contenedor usa únicamente las credenciales ficticias `turnox/turnox_dev`.
+La API requiere `DATABASE_URL`; sus migraciones se aplican con Prisma y no con
+`db push`.
+
+Para ejecutar la suite de integración real contra una base PostgreSQL migrada:
+
+```bash
+RUN_INTEGRATION_TESTS=true pnpm --filter @turnox/api test:integration
+```

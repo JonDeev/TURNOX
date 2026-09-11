@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { AppModule } from './app.module.js';
 import { configureApplication } from './app.factory.js';
+import { DatabaseReadinessService } from './database/database-readiness.service.js';
 import { REDACTED_LOG_PATHS } from './logging/structured-logger.js';
 
 @Controller('__test')
@@ -24,11 +25,16 @@ describe('API bootstrap', () => {
     app = undefined;
   });
 
-  async function createTestApplication(): Promise<NestExpressApplication> {
+  async function createTestApplication(databaseAvailable = true): Promise<NestExpressApplication> {
+    process.env.DATABASE_URL ??= 'postgresql://turnox:turnox_test@localhost:5432/turnox';
+    const database = { isReady: async () => databaseAvailable };
     const module = await Test.createTestingModule({
       controllers: [UnexpectedErrorController],
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(DatabaseReadinessService)
+      .useValue(database)
+      .compile();
 
     app = module.createNestApplication<NestExpressApplication>();
     configureApplication(app);
@@ -40,13 +46,25 @@ describe('API bootstrap', () => {
     return request(testApp.getHttpAdapter().getInstance());
   }
 
-  it('serves liveness and readiness without checking unimplemented dependencies', async () => {
+  it('keeps liveness independent and reports database readiness', async () => {
     const testApp = await createTestApplication();
 
     await httpRequest(testApp).get('/health/live').expect(200, { status: 'ok' });
     await httpRequest(testApp)
       .get('/health/ready')
-      .expect(200, { status: 'ok', checks: { process: 'up' } });
+      .expect(200, { status: 'ok', checks: { process: 'up', database: 'up' } });
+  });
+
+  it('reports not ready when the database check fails while liveness stays up', async () => {
+    const testApp = await createTestApplication(false);
+
+    await httpRequest(testApp).get('/health/live').expect(200, { status: 'ok' });
+    const response = await httpRequest(testApp).get('/health/ready').expect(503);
+    expect(response.body).toMatchObject({
+      code: 'DATABASE_UNAVAILABLE',
+      message: 'Database is not ready',
+      statusCode: 503,
+    });
   });
 
   it('generates and propagates a bounded correlation id', async () => {

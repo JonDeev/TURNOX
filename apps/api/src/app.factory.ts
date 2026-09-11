@@ -59,7 +59,7 @@ export function configureApplication(app: NestExpressApplication): void {
           message: 'Request validation failed',
         }),
       forbidNonWhitelisted: true,
-      transform: false,
+      transform: true,
       whitelist: true,
     }),
   );

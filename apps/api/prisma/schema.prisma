@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DeviceType {
+  KIOSK
+  PRINT_AGENT
+  DISPLAY
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(160)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  sites              Site[]
+  services           Service[]
+  rooms              Room[]
+  counters           Counter[]
+  users              User[]
+  serviceAssignments ServiceAssignment[]
+  devices            Device[]
+
+  @@index([active])
+  @@map("organizations")
+}
+
+model Site {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  name           String   @db.VarChar(160)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  services     Service[]
+  rooms        Room[]
+  counters     Counter[]
+  users        User[]
+  devices      Device[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@index([organizationId, active])
+  @@map("sites")
+}
+
+model Service {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  siteId         String   @db.Uuid
+  name           String   @db.VarChar(160)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site                @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  assignments  ServiceAssignment[]
+
+  @@unique([organizationId, id])
+  @@unique([siteId, name])
+  @@index([organizationId, siteId, active])
+  @@map("services")
+}
+
+model Room {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  siteId         String   @db.Uuid
+  name           String   @db.VarChar(160)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site         @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  counters     Counter[]
+  devices      Device[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, siteId, id])
+  @@unique([siteId, name])
+  @@index([organizationId, siteId, active])
+  @@map("rooms")
+}
+
+model Counter {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  siteId         String   @db.Uuid
+  roomId         String?  @db.Uuid
+  name           String   @db.VarChar(120)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site         @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  room         Room?        @relation(fields: [organizationId, siteId, roomId], references: [organizationId, siteId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([siteId, name])
+  @@index([organizationId, siteId, active])
+  @@map("counters")
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  siteId         String?  @db.Uuid
+  email          String   @db.VarChar(320)
+  fullName       String   @db.VarChar(160)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site?               @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  assignments  ServiceAssignment[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, email])
+  @@index([organizationId, siteId, active])
+  @@map("users")
+}
+
+model ServiceAssignment {
+  organizationId String   @db.Uuid
+  userId         String   @db.Uuid
+  serviceId      String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [organizationId, userId], references: [organizationId, id], onDelete: Restrict)
+  service      Service      @relation(fields: [organizationId, serviceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@id([organizationId, userId, serviceId])
+  @@index([organizationId, serviceId])
+  @@map("service_assignments")
+}
+
+model Device {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @db.Uuid
+  siteId         String     @db.Uuid
+  roomId         String?    @db.Uuid
+  name           String     @db.VarChar(120)
+  type           DeviceType
+  enabled        Boolean    @default(true)
+  metadata       Json       @default("{}")
+  createdAt      DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime   @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site         @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  room         Room?        @relation(fields: [organizationId, siteId, roomId], references: [organizationId, siteId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id])
+  @@unique([siteId, name])
+  @@index([organizationId, siteId, type, enabled])
+  @@map("devices")
+}

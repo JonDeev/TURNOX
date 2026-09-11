@@ -17,6 +17,8 @@ interface ExceptionResponseBody {
   readonly message?: unknown;
 }
 
+const SAFE_SERVER_ERROR_CODES = new Set(['DATABASE_UNAVAILABLE']);
+
 function isRecord(value: unknown): value is ExceptionResponseBody {
   return typeof value === 'object' && value !== null;
 }
@@ -54,7 +56,7 @@ export class HttpExceptionFilter {
     const request = http.getRequest<Request>();
     const response = http.getResponse<Response>();
     const correlationId = getHeaderValue(response, request);
-    const isExpected = exception instanceof HttpException && exception.getStatus() < 500;
+    const isExpected = this.isSafeHttpException(exception);
     const statusCode =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const errorResponse = this.createErrorResponse(
@@ -72,6 +74,23 @@ export class HttpExceptionFilter {
     }
 
     response.status(statusCode).json(errorResponse);
+  }
+
+  private isSafeHttpException(exception: unknown): boolean {
+    if (!(exception instanceof HttpException)) {
+      return false;
+    }
+
+    if (exception.getStatus() < 500) {
+      return true;
+    }
+
+    const response = exception.getResponse();
+    return (
+      isRecord(response) &&
+      typeof response.code === 'string' &&
+      SAFE_SERVER_ERROR_CODES.has(response.code)
+    );
   }
 
   private createErrorResponse(

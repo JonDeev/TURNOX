@@ -5,6 +5,7 @@ export const LOG_LEVEL_VALUES = ['fatal', 'error', 'warn', 'info', 'debug', 'tra
 export type LogLevel = (typeof LOG_LEVEL_VALUES)[number];
 
 export interface AppConfiguration {
+  readonly databaseUrl: string;
   readonly nodeEnv: NodeEnvironment;
   readonly port: number;
   readonly host: string;

@@ -31,6 +31,23 @@ function getOptionalString(input: Record<string, unknown>, key: string): string 
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function getRequiredString(input: Record<string, unknown>, key: string): string {
+  const value = getOptionalString(input, key);
+
+  if (value === undefined) {
+    throw new Error(`${key} is required`);
+  }
+
+  return value;
+}
+
+function parseDatabaseUrl(input: Record<string, unknown>, nodeEnv: NodeEnvironment): string {
+  const value = getOptionalString(input, 'DATABASE_URL');
+  if (value !== undefined) return value;
+  if (nodeEnv === 'test') return 'postgresql://turnox:turnox_test@127.0.0.1:5432/turnox';
+  return getRequiredString(input, 'DATABASE_URL');
+}
+
 function parseNodeEnvironment(value: string | undefined): NodeEnvironment {
   const candidate = value ?? DEFAULTS.nodeEnv;
 
@@ -145,13 +162,15 @@ function parseCorsOrigins(value: string | undefined, nodeEnv: NodeEnvironment): 
 
 export function parseAppConfiguration(input: Record<string, unknown>): AppConfiguration {
   const nodeEnv = parseNodeEnvironment(getOptionalString(input, 'NODE_ENV'));
+  const corsOrigins = parseCorsOrigins(getOptionalString(input, 'CORS_ORIGINS'), nodeEnv);
 
   return {
+    databaseUrl: parseDatabaseUrl(input, nodeEnv),
     nodeEnv,
     port: parsePort(getOptionalString(input, 'PORT')),
     host: parseHost(getOptionalString(input, 'HOST')),
     logLevel: parseLogLevel(getOptionalString(input, 'LOG_LEVEL')),
-    corsOrigins: parseCorsOrigins(getOptionalString(input, 'CORS_ORIGINS'), nodeEnv),
+    corsOrigins,
     bodyLimit: parseBodyLimit(getOptionalString(input, 'BODY_LIMIT')),
     trustProxy: parseBoolean(
       getOptionalString(input, 'TRUST_PROXY'),

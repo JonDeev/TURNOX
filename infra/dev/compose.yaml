@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: turnox
+      POSTGRES_USER: turnox
+      POSTGRES_PASSWORD: turnox_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turnox -d turnox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - turnox-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  turnox-postgres-data:

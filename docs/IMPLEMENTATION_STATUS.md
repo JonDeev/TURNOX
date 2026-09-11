@@ -1,8 +1,8 @@
 # TURNOX — Implementation Status
 
-Último prompt: P1.2
-Fase actual: 1; siguiente: P1.3 — Modelo organizacional y configuración operativa
-Estado: FASE 1 — BOOTSTRAP DE API COMPLETADO
+Último prompt: P1.3
+Fase actual: 1; siguiente: P1.4 — Autenticación, RBAC y contratos base
+Estado: FASE 1 — MODELO ORGANIZACIONAL Y CONFIGURACIÓN OPERATIVA IMPLEMENTADOS
 
 ## Resultado del GATE
 
@@ -295,6 +295,38 @@ modificación y continúan diferidas a las fases indicadas.
   a P1.3 o a fases posteriores.
 - Bloqueadores reales: ninguno.
 
+## Entregado en P1.3 — modelo organizacional y configuración operativa
+
+- PostgreSQL integrado mediante Prisma Client y `@prisma/adapter-pg`; `DATABASE_URL` es obligatorio para desarrollo/producción y existe una excepción controlada para tests unitarios.
+- Prisma schema en [`apps/api/prisma/schema.prisma`](../apps/api/prisma/schema.prisma) con `Organization`, `Site`, `Service`, `Room`, `Counter`, `User`, `ServiceAssignment` y `Device`.
+- IDs UUID, timestamps `TIMESTAMPTZ(3)` con defaults del servidor y triggers PostgreSQL para `updatedAt`; no se guardan credenciales ni passwords.
+- Migración inicial en [`apps/api/prisma/migrations/20260910120000_initial_organizational_operational_model/migration.sql`](../apps/api/prisma/migrations/20260910120000_initial_organizational_operational_model/migration.sql), sin datos productivos y con `ON DELETE RESTRICT`.
+- CRUD administrativo mínimo y activación/desactivación mediante PATCH para organizaciones, sedes, servicios, salas, módulos, usuarios y dispositivos; asignación explícita usuario-servicio.
+- Rutas de recursos operativos anidadas bajo `/organizations/:organizationId/...`; servicios, salas, módulos, usuarios y dispositivos validan scope en el caso de uso y PostgreSQL lo refuerza con FKs compuestas organización/sede.
+- Índices para scope, estado, tipo y claves únicas por organización/sede; metadata de dispositivos limitada a JSON operativo sin pairing, secretos ni heartbeat.
+- `/health/live` sigue independiente; `/health/ready` ejecuta `SELECT 1` mediante un adapter de readiness y responde `503 DATABASE_UNAVAILABLE` si PostgreSQL no está disponible.
+- Compose opcional para desarrollo en [`infra/dev/compose.yaml`](../infra/dev/compose.yaml) con PostgreSQL 18, credenciales ficticias, volumen local y healthcheck; no se agregó Redis.
+
+## Validaciones de P1.3
+
+- `pnpm install --frozen-lockfile` — PASS.
+- `pnpm build` — PASS.
+- `pnpm lint` — PASS.
+- `pnpm typecheck` — PASS.
+- `pnpm test` — PASS: 9 tests API y suite existente del monorepo; 1 test de integración omitido sin PostgreSQL explícita.
+- `pnpm --filter @turnox/api test:integration` — PASS operativo con la suite omitida cuando no se define `RUN_INTEGRATION_TESTS=true`; con PostgreSQL real ejecuta pruebas E2E de relaciones, uniqueness y aislamiento.
+- `pnpm format:check` — PASS.
+- `git diff --check` — PASS.
+- `prisma validate` y `prisma generate` — PASS.
+- `prisma migrate deploy` desde la WSL actual — BLOQUEADO por ausencia de Docker, Podman y PostgreSQL local; el comando se ejecutó contra `127.0.0.1:5432` y no había servidor disponible. La migración queda lista para validarse desde DB vacía con `infra/dev/compose.yaml`.
+
+## Decisiones, bloqueos y deuda de P1.3
+
+- Prisma 8 estable no está publicado en el registro al momento de implementar P1.3; la última estable disponible es Prisma 7.10.0. Se usó 7.10.0 con adapter PostgreSQL, sin usar una release dev/RC de Prisma 8. Deuda: revisar upgrade al publicarse Prisma 8 estable.
+- La autenticación, `password_hash`, roles, permisos y autorización efectiva permanecen deliberadamente para P1.4. Las rutas P1.3 usan el `organizationId` explícito de la URL como contexto de pruebas y servicio, no como autenticación.
+- No se implementaron tickets, jornada, consecutivos, `AdvisorSession`, Queue Engine, realtime, Outbox, Event Log, impresión ni multimedia.
+- Bloqueo real restante: ejecutar migración desde PostgreSQL vacío y la suite de integración contra PostgreSQL real en un entorno con Docker o una instancia PostgreSQL disponible.
+
 ## Próximo prompt
 
-P1.3 — Modelo organizacional y configuración operativa
+P1.4 — Autenticación, RBAC y contratos base

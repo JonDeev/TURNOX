@@ -4,7 +4,9 @@ packages:
 
 allowBuilds:
   '@nestjs/core': true
+  '@prisma/engines': true
   esbuild: true
+  prisma: true
 
 catalog:
   '@eslint/js': 10.0.1
