@@ -1,16 +1,20 @@
 import 'reflect-metadata';
 
-import { NestFactory } from '@nestjs/core';
-
-import { AppModule } from './app.module.js';
-
-const defaultPort = 3000;
+import { createApplication } from './app.factory.js';
+import type { ConfigurationRoot } from './config/configuration.types.js';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
-  const port = Number(process.env.PORT ?? defaultPort);
+  const app = await createApplication();
+  const configuration = app.get(ConfigService<ConfigurationRoot>).getOrThrow('app');
 
-  await app.listen(port);
+  await app.listen(configuration.port, configuration.host);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : 'Unknown bootstrap error';
+  process.stderr.write(
+    `${JSON.stringify({ level: 'fatal', message: 'API bootstrap failed', error: message, service: 'turnox-api' })}\n`,
+  );
+  process.exitCode = 1;
+});

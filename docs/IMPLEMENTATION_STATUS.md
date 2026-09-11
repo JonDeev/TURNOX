@@ -1,8 +1,8 @@
 # TURNOX — Implementation Status
 
-Último prompt: P1.1
-Fase actual: 1; siguiente: P1.2 — Bootstrap de API y configuración
-Estado: FASE 1 — FUNDACIÓN TÉCNICA COMPLETADA
+Último prompt: P1.2
+Fase actual: 1; siguiente: P1.3 — Modelo organizacional y configuración operativa
+Estado: FASE 1 — BOOTSTRAP DE API COMPLETADO
 
 ## Resultado del GATE
 
@@ -256,6 +256,45 @@ pero su ausencia actual no hace incorrecto construir el software desacoplado.
 Ninguno. Las validaciones físicas pendientes de Fase 0 se conservan sin
 modificación y continúan diferidas a las fases indicadas.
 
+## Entregado en P1.2 — bootstrap profesional de API
+
+- Configuración central, tipada y fail-fast para `NODE_ENV`, `PORT`, `HOST`,
+  `LOG_LEVEL`, CORS, límite de body y `TRUST_PROXY`, con `.env.example` seguro.
+- Bootstrap NestJS/Express con shutdown hooks, body parsers limitados, Helmet,
+  CORS explícito y validación global preparada para futuros DTOs.
+- Health operativo separado: `/health/live` y `/health/ready`; readiness solo
+  verifica el proceso porque todavía no existen dependencias conectadas.
+- Logging Pino estructurado con niveles configurables, JSON en producción,
+  formato legible en desarrollo, redaction, request id, método, ruta, estado,
+  duración y errores.
+- Correlation ID seguro por request, respuesta uniforme de errores HTTP y
+  ocultamiento de detalles inesperados en respuestas.
+- No se implementaron dominio, auth, Prisma, PostgreSQL, Redis, Socket.IO,
+  Outbox, Event Log ni funcionalidades de negocio.
+
+## Validaciones de P1.2
+
+- `pnpm build` — PASS; todos los paquetes del monorepo compilan.
+- `pnpm lint` — PASS.
+- `pnpm typecheck` — PASS.
+- `pnpm test` — PASS; 8 pruebas del API más la suite existente del monorepo.
+  El sandbox requirió permisos ampliados para abrir sockets efímeros de
+  Supertest.
+- `pnpm format:check` — PASS.
+- `git diff --check` — PASS.
+- Smoke real — PASS: arranque válido, configuración inválida con salida 1,
+  health, correlation ID, headers y error production sin stack en respuesta.
+
+## Decisiones y bloqueos de P1.2
+
+- Se mantuvo Express, sin prefijo ni versionado ficticio porque V4 no define
+  todavía una estrategia HTTP adicional.
+- CORS exige orígenes explícitos en producción; desarrollo usa solo los puertos
+  locales de Console y Kiosk. `TRUST_PROXY` permanece desactivado por defecto.
+- No se añadieron `DATABASE_URL`, Prisma ni conexiones externas: corresponden
+  a P1.3 o a fases posteriores.
+- Bloqueadores reales: ninguno.
+
 ## Próximo prompt
 
-P1.2 — Bootstrap de API y configuración
+P1.3 — Modelo organizacional y configuración operativa
