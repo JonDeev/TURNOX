@@ -13,6 +13,31 @@ enum DeviceType {
   DISPLAY
 }
 
+enum AdminAuditActorType {
+  UNAUTHENTICATED
+  USER
+}
+
+enum AdminAuditResourceType {
+  ORGANIZATION
+  SITE
+  SERVICE
+  ROOM
+  COUNTER
+  USER
+  SERVICE_ASSIGNMENT
+  DEVICE
+}
+
+enum AdminAuditAction {
+  CREATE
+  UPDATE
+  ENABLE
+  DISABLE
+  ASSIGN
+  UNASSIGN
+}
+
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(160)
@@ -27,6 +52,7 @@ model Organization {
   users              User[]
   serviceAssignments ServiceAssignment[]
   devices            Device[]
+  adminAuditLogs     AdminAuditLog[]
 
   @@index([active])
   @@map("organizations")
@@ -40,12 +66,13 @@ model Site {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @default(now()) @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  services     Service[]
-  rooms        Room[]
-  counters     Counter[]
-  users        User[]
-  devices      Device[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  services       Service[]
+  rooms          Room[]
+  counters       Counter[]
+  users          User[]
+  devices        Device[]
+  adminAuditLogs AdminAuditLog[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -123,9 +150,10 @@ model User {
   createdAt      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime @default(now()) @db.Timestamptz(3)
 
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  site         Site?               @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
-  assignments  ServiceAssignment[]
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site           Site?               @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  assignments    ServiceAssignment[]
+  adminAuditLogs AdminAuditLog[]     @relation("AdminAuditActor")
 
   @@unique([organizationId, id])
   @@unique([organizationId, email])
@@ -168,4 +196,27 @@ model Device {
   @@unique([siteId, name])
   @@index([organizationId, siteId, type, enabled])
   @@map("devices")
+}
+
+model AdminAuditLog {
+  id             String                 @id @default(uuid()) @db.Uuid
+  organizationId String                 @db.Uuid
+  siteId         String?                @db.Uuid
+  resourceType   AdminAuditResourceType
+  resourceId     String                 @db.VarChar(160)
+  action         AdminAuditAction
+  createdAt      DateTime               @default(now()) @db.Timestamptz(3)
+  actorUserId    String?                @db.Uuid
+  actorType      AdminAuditActorType    @default(UNAUTHENTICATED)
+  correlationId  String?                @db.VarChar(64)
+  metadata       Json                   @default("{}")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  site         Site?        @relation(fields: [organizationId, siteId], references: [organizationId, id], onDelete: Restrict)
+  actorUser    User?        @relation("AdminAuditActor", fields: [organizationId, actorUserId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([actorUserId, createdAt])
+  @@map("admin_audit_logs")
 }

@@ -2,7 +2,7 @@
 
 Último prompt: P1.3
 Fase actual: 1; siguiente: P1.4 — Autenticación, RBAC y contratos base
-Estado: P1.3 — IMPLEMENTADO PERO BLOQUEADO PARA CIERRE POR VALIDACIÓN POSTGRESQL REAL
+Estado: P1.3 — COMPLETADO Y VALIDADO
 
 ## Resultado del GATE
 
@@ -307,32 +307,59 @@ modificación y continúan diferidas a las fases indicadas.
 - `/health/live` sigue independiente; `/health/ready` ejecuta `SELECT 1` mediante un adapter de readiness y responde `503 DATABASE_UNAVAILABLE` si PostgreSQL no está disponible.
 - Compose opcional para desarrollo en [`infra/dev/compose.yaml`](../infra/dev/compose.yaml) con PostgreSQL 18, credenciales ficticias, volumen local y healthcheck; no se agregó Redis.
 - La revisión P1.3 corrigió los DTOs de respuesta para copiar únicamente campos públicos explícitos, clasificó `P2025` como `RESOURCE_NOT_FOUND`, rechazó nombres compuestos solo por espacios y eliminó el borrado global de datos en la suite de integración.
+- Auditoría administrativa persistente mediante `AdminAuditLog`, append-only desde la aplicación, para todas las mutaciones administrativas existentes de organizaciones, sedes, servicios, salas, módulos, usuarios, asignaciones usuario-servicio y dispositivos.
+- El modelo de auditoría conserva organización, sede cuando aplica, tipo/identificador de recurso, acción, timestamp de servidor, actor nullable/tipo de actor, correlation ID y metadata controlada de campos modificados; no registra cuerpos completos, credenciales, secretos ni metadata operativa de dispositivos.
+- La auditoría no usa una FK polimórfica al recurso: mantiene `resourceType` + `resourceId` como referencia histórica y FKs reales a organización, sede y actor cuando corresponda, todas sin `ON DELETE CASCADE`.
+- Actor actual explícitamente `UNAUTHENTICATED` con `actorUserId` nullable; la tabla queda preparada para que P1.4 aporte el usuario autenticado sin aceptar un actor desde HTTP.
+- Los casos de uso realizan mutación y auditoría en la misma transacción Prisma/PostgreSQL; los controllers siguen sin acceso a Prisma y solo propagan el correlation ID validado por el middleware.
 
 ## Validaciones de P1.3
 
-- `pnpm install --frozen-lockfile` — PASS con el lockfile sin cambios; el primer intento dentro del sandbox falló por DNS y se restauró mediante instalación aprobada.
+- `docker version` — PASS: Docker Desktop 29.7.2; `docker compose version` — PASS: Compose v5.5.1; `docker info` — PASS.
+- `docker compose -f infra/dev/compose.yaml up -d` — PASS después de corregir el destino del volumen para PostgreSQL 18; el servicio `dev-postgres-1` quedó `healthy` con `postgres:18-alpine` en `127.0.0.1:5432`.
+- La base `turnox` local fue comprobada vacía antes de migrar: no existían tablas `organizations` ni `_prisma_migrations`; no se usó `prisma db push`.
+- `pnpm install --frozen-lockfile` — PASS con el lockfile sin cambios; el primer intento dentro del sandbox falló por DNS y se completó mediante instalación aprobada.
 - `pnpm --filter @turnox/api exec prisma validate` — PASS.
 - `pnpm --filter @turnox/api exec prisma generate` — PASS.
+- `pnpm --filter @turnox/api db:migrate` — PASS desde PostgreSQL vacío; se aplicó `20260910120000_initial_organizational_operational_model`.
+- `pnpm --filter @turnox/api exec prisma migrate status` — PASS: database schema is up to date; no migrations failed.
+- Constraints reales — PASS: 16 FKs iniciales más 3 FKs de auditoría y unicidades/claves definidas aplicadas; la suite rechazó cruces de organización/sede/sala, `NOT NULL`, duplicado de sede y duplicado de `ServiceAssignment` directamente contra PostgreSQL.
+- Aislamiento multi-organización — PASS para Service, Room, Counter, Device, User/Site y ServiceAssignment; la suite validó tanto rechazo de API como FKs compuestas reales.
+- User-Service — PASS: asignación válida, duplicada rechazada y organización cruzada rechazada.
+- Timestamps — PASS: `createdAt`/`updatedAt` generados por PostgreSQL y `updatedAt` incrementado en una actualización real mediante trigger.
+- Readiness/liveness con PostgreSQL — PASS: `/health/ready` respondió 200 con database `up`; `/health/live` respondió 200.
+- Readiness/liveness sin PostgreSQL — PASS en `app.bootstrap.spec.ts`: readiness 503 con `DATABASE_UNAVAILABLE` y liveness 200 usando el mecanismo controlado existente.
+- `RUN_INTEGRATION_TESTS=true DATABASE_URL=postgresql://turnox:turnox_dev@127.0.0.1:5432/turnox pnpm --filter @turnox/api test:integration` — PASS: 1 test, 1 passed, 0 failed.
 - `pnpm build` — PASS.
 - `pnpm lint` — PASS.
 - `pnpm typecheck` — PASS.
-- `pnpm test` — PASS: 9 tests API y suite existente del monorepo; la suite de integración PostgreSQL aparece omitida al no habilitarse explícitamente.
-- `pnpm --filter @turnox/api test:integration` — ejecutado sin habilitación y omitido, no se considera PASS de PostgreSQL.
-- `RUN_INTEGRATION_TESTS=true ... pnpm --filter @turnox/api test:integration` — FAIL de infraestructura al conectar a `127.0.0.1:5432`; la suite no pudo ejecutar sus aserciones reales.
-- `pnpm --filter @turnox/api db:deploy` y `db:migrate` — BLOQUEADOS por ausencia de un servidor PostgreSQL disponible.
-- `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` — PASS como revisión estática del datamodel; no sustituye aplicar la migración a PostgreSQL.
+- `pnpm test` — PASS con permisos ampliados: 9 tests pasados en API, 1 integración omitida por no habilitarse y suite restante del monorepo pasada.
 - `pnpm format:check` — PASS.
 - `git diff --check` — PASS.
-- Docker/Podman/PostgreSQL local — NO DISPONIBLE: Docker Desktop existe, pero el daemon `desktop-linux` no está iniciado; no se levantó ningún contenedor.
+- Migración incremental `20260911100000_add_admin_audit_logs` — PASS sobre la base local existente; la migración inicial de P1.3 no fue modificada.
+- Migración completa desde PostgreSQL vacío temporal — PASS: se aplicaron las 2 migraciones de la cadena y se comprobaron `organizations` y `admin_audit_logs`; la base temporal fue eliminada después de la prueba.
+- `RUN_INTEGRATION_TESTS=true DATABASE_URL=postgresql://turnox:turnox_dev@127.0.0.1:5432/turnox pnpm --filter @turnox/api test:integration` — PASS: 2 archivos, 3 tests; CREATE, UPDATE, ENABLE, DISABLE, ASSIGN, UNASSIGN, scope organización/sede, actor no autenticado, timestamp y rollback de mutación + auditoría.
+- `pnpm install --frozen-lockfile` — PASS con lockfile sin cambios.
+- `pnpm build` — PASS.
+- `pnpm lint` — PASS.
+- `pnpm typecheck` — PASS.
+- `pnpm test` — PASS: suite completa del monorepo; API 9 tests pasados y 3 integración omitidos por no habilitarse en el comando unitario.
+- `pnpm format:check` — PASS.
+- `git diff --check` — PASS.
 
 ## Decisiones, bloqueos y deuda de P1.3
 
+- Se corrigió un defecto demostrado de infraestructura: `postgres:18-alpine` requiere montar el volumen en `/var/lib/postgresql`, no en `/var/lib/postgresql/data`; no se agregaron servicios.
+- Se corrigió un defecto demostrado de P1.3 en la paginación: los servicios de listado normalizan `page` y `pageSize` cuando Nest entrega una query sin valores por defecto.
 - Prisma 8 estable no está publicado en el registry consultado: `pnpm view prisma version` devolvió `8.0.0-rc.13`, mientras `pnpm view @prisma/client version` devolvió `7.10.0`. La versión final es Prisma/Client `7.10.0` con `@prisma/adapter-pg`; no se adopta una RC. Deuda: revisar upgrade cuando exista una release estable y validar generate, migrate, build, tipos y tests.
 - La autenticación, `password_hash`, roles, permisos y autorización efectiva permanecen deliberadamente para P1.4. Las rutas P1.3 usan el `organizationId` explícito de la URL como contexto de pruebas y servicio, no como autenticación.
-- La auditoría administrativa persistente prevista por V4/P1.3 no está implementada; el logging HTTP existente no la sustituye. No se agregó durante esta revisión porque la tarea prohíbe incorporar funcionalidades nuevas y aún no existe identidad/autorización de actor.
+- V4 §45 establece que la auditoría debe existir desde el inicio y exige auditoría administrativa persistente, incluyendo quién creó servicios, modificó usuarios, deshabilitó módulos o cambió asignaciones. El criterio queda cubierto por `AdminAuditLog`; el logging HTTP existente continúa siendo observabilidad y no sustituye la auditoría.
 - No se implementaron tickets, jornada, consecutivos, `AdvisorSession`, Queue Engine, realtime, Outbox, Event Log, impresión ni multimedia.
-- Bloqueo real: ejecutar la migración desde una base PostgreSQL vacía y la suite de integración contra PostgreSQL real. No se validaron aún en ejecución las FKs, uniques, `NOT NULL`, triggers, readiness con `SELECT 1` ni la limpieza segura de la suite.
+- No se implementaron login, password/password_hash, auth guards, RBAC, cookies, access/refresh tokens ni sesiones; tampoco se añadió CRUD HTTP de auditoría.
+- Deuda técnica real: P1.4 debe conectar el contexto autenticado con `actorUserId`/`actorType` y autorización server-side; no requiere rediseñar la tabla. La retención y consulta operativa de auditoría se definirán cuando exista el alcance correspondiente, sin convertirla en Event Log realtime.
 
 ## Próximo prompt
 
-P1.4 — Autenticación, RBAC y contratos base
+P1.3 — APROBADO PARA CONTINUAR A P1.4
+
+Próximo prompt: P1.4 — Autenticación, RBAC y contratos base

@@ -31,6 +31,16 @@ export interface Page<T> {
   readonly total: number;
 }
 
+export function paginationOf(query: Partial<PaginationQueryDto>): {
+  readonly page: number;
+  readonly pageSize: number;
+} {
+  return {
+    page: query.page ?? 1,
+    pageSize: query.pageSize ?? DEFAULT_PAGE_SIZE,
+  };
+}
+
 export function pageOf<T>(
   items: readonly T[],
   page: number,

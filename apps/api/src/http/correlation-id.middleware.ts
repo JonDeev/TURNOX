@@ -4,6 +4,10 @@ import { performance } from 'node:perf_hooks';
 
 import { StructuredLogger } from '../logging/structured-logger.js';
 
+export interface CorrelatedRequest extends Request {
+  correlationId?: string;
+}
+
 export const CORRELATION_ID_HEADER = 'X-Correlation-Id';
 const CORRELATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
@@ -17,6 +21,7 @@ function getCorrelationId(request: Request): string {
 export function requestLoggingMiddleware(logger: StructuredLogger) {
   return (request: Request, response: Response, next: NextFunction): void => {
     const correlationId = getCorrelationId(request);
+    (request as CorrelatedRequest).correlationId = correlationId;
     const startedAt = performance.now();
     let completed = false;
 

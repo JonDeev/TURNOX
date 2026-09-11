@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - turnox-postgres-data:/var/lib/postgresql/data
+      - turnox-postgres-data:/var/lib/postgresql
 
 volumes:
   turnox-postgres-data:

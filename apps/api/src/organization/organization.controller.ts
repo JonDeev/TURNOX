@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { CorrelatedRequest } from '../http/correlation-id.middleware.js';
 
 import {
   CreateOrganizationDto,
@@ -13,8 +15,11 @@ export class OrganizationController {
   constructor(private readonly organizations: OrganizationService) {}
 
   @Post()
-  create(@Body() dto: CreateOrganizationDto): Promise<OrganizationResponseDto> {
-    return this.organizations.create(dto);
+  create(
+    @Body() dto: CreateOrganizationDto,
+    @Req() request: CorrelatedRequest,
+  ): Promise<OrganizationResponseDto> {
+    return this.organizations.create(dto, request.correlationId);
   }
 
   @Get()
@@ -33,7 +38,8 @@ export class OrganizationController {
   update(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: UpdateOrganizationDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<OrganizationResponseDto> {
-    return this.organizations.update(organizationId, dto);
+    return this.organizations.update(organizationId, dto, request.correlationId);
   }
 }

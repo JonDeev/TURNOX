@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { CorrelatedRequest } from '../http/correlation-id.middleware.js';
 
 import {
   CreateDeviceDto,
@@ -16,8 +18,9 @@ export class DeviceController {
   create(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateDeviceDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<DeviceResponseDto> {
-    return this.devices.create(organizationId, dto);
+    return this.devices.create(organizationId, dto, request.correlationId);
   }
 
   @Get()
@@ -41,7 +44,8 @@ export class DeviceController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('deviceId', ParseUUIDPipe) deviceId: string,
     @Body() dto: UpdateDeviceDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<DeviceResponseDto> {
-    return this.devices.update(organizationId, deviceId, dto);
+    return this.devices.update(organizationId, deviceId, dto, request.correlationId);
   }
 }

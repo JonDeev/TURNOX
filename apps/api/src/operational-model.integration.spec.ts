@@ -29,6 +29,7 @@ integration('organizational model against PostgreSQL', () => {
   afterAll(async () => {
     if (prisma !== undefined && testOrganizationIds.length > 0) {
       const scope = { organizationId: { in: testOrganizationIds } };
+      await prisma.adminAuditLog.deleteMany({ where: scope });
       await prisma.serviceAssignment.deleteMany({ where: scope });
       await prisma.device.deleteMany({ where: scope });
       await prisma.counter.deleteMany({ where: scope });
@@ -50,6 +51,12 @@ integration('organizational model against PostgreSQL', () => {
     const orgB = organizationB.body.id as string;
     testOrganizationIds.push(orgA, orgB);
 
+    const createdAt = new Date(organizationA.body.createdAt as string).getTime();
+    const initialUpdatedAt = new Date(organizationA.body.updatedAt as string).getTime();
+    expect(createdAt).toBeGreaterThan(0);
+    expect(initialUpdatedAt).toBeGreaterThan(0);
+    await prisma.$executeRaw`SELECT pg_sleep(0.01)`;
+
     await http.get(`/organizations/${orgA}`).expect(200);
     const organizations = await http.get('/organizations').expect(200);
     expect(organizations.body.items).toEqual(
@@ -58,7 +65,13 @@ integration('organizational model against PostgreSQL', () => {
         expect.objectContaining({ id: orgB }),
       ]),
     );
-    await http.patch(`/organizations/${orgA}`).send({ active: false }).expect(200);
+    const deactivatedOrganization = await http
+      .patch(`/organizations/${orgA}`)
+      .send({ active: false })
+      .expect(200);
+    expect(new Date(deactivatedOrganization.body.updatedAt as string).getTime()).toBeGreaterThan(
+      initialUpdatedAt,
+    );
     await http
       .patch(`/organizations/${orgA}`)
       .send({ name: 'Org A Updated', active: true })

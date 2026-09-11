@@ -1,23 +1,43 @@
 import { Injectable } from '@nestjs/common';
 
-import { pageOf, type Page } from '../common/pagination.dto.js';
+import { pageOf, paginationOf, type Page } from '../common/pagination.dto.js';
 import {
   InvalidRelationshipException,
   ResourceNotFoundException,
 } from '../common/resource.exceptions.js';
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
 import { CreateSiteDto, SiteListQueryDto, SiteResponseDto, UpdateSiteDto } from './dto/site.dto.js';
 
 @Injectable()
 export class SiteService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AdminAuditService,
+  ) {}
 
-  async create(organizationId: string, dto: CreateSiteDto): Promise<SiteResponseDto> {
+  async create(
+    organizationId: string,
+    dto: CreateSiteDto,
+    correlationId?: string,
+  ): Promise<SiteResponseDto> {
     await this.ensureOrganization(organizationId);
     try {
-      const site = await this.prisma.site.create({
-        data: { organizationId, name: dto.name.trim() },
+      const site = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.site.create({
+          data: { organizationId, name: dto.name.trim() },
+        });
+        await this.audit.record(tx, {
+          organizationId,
+          siteId: created.id,
+          resourceType: 'SITE',
+          resourceId: created.id,
+          action: 'CREATE',
+          correlationId,
+          metadata: auditMetadata(),
+        });
+        return created;
       });
       return new SiteResponseDto(site);
     } catch (error: unknown) {
@@ -31,15 +51,16 @@ export class SiteService {
       organizationId,
       ...(query.active === undefined ? {} : { active: query.active }),
     };
-    const skip = (query.page - 1) * query.pageSize;
+    const { page, pageSize } = paginationOf(query);
+    const skip = (page - 1) * pageSize;
     const [sites, total] = await this.prisma.$transaction([
-      this.prisma.site.findMany({ orderBy: { name: 'asc' }, skip, take: query.pageSize, where }),
+      this.prisma.site.findMany({ orderBy: { name: 'asc' }, skip, take: pageSize, where }),
       this.prisma.site.count({ where }),
     ]);
     return pageOf(
       sites.map((site) => new SiteResponseDto(site)),
-      query.page,
-      query.pageSize,
+      page,
+      pageSize,
       total,
     );
   }
@@ -50,15 +71,42 @@ export class SiteService {
     return new SiteResponseDto(site);
   }
 
-  async update(organizationId: string, id: string, dto: UpdateSiteDto): Promise<SiteResponseDto> {
-    await this.get(organizationId, id);
+  async update(
+    organizationId: string,
+    id: string,
+    dto: UpdateSiteDto,
+    correlationId?: string,
+  ): Promise<SiteResponseDto> {
+    const current = await this.get(organizationId, id);
     try {
-      const site = await this.prisma.site.update({
-        data: {
-          ...(dto.name === undefined ? {} : { name: dto.name.trim() }),
-          ...(dto.active === undefined ? {} : { active: dto.active }),
-        },
-        where: { id },
+      const changedFields = [
+        ...(dto.name === undefined ? [] : ['name']),
+        ...(dto.active === undefined ? [] : ['active']),
+      ];
+      const action =
+        changedFields.length === 1 && dto.active !== undefined && dto.active !== current.active
+          ? dto.active
+            ? 'ENABLE'
+            : 'DISABLE'
+          : 'UPDATE';
+      const site = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.site.update({
+          data: {
+            ...(dto.name === undefined ? {} : { name: dto.name.trim() }),
+            ...(dto.active === undefined ? {} : { active: dto.active }),
+          },
+          where: { id },
+        });
+        await this.audit.record(tx, {
+          organizationId,
+          siteId: updated.id,
+          resourceType: 'SITE',
+          resourceId: updated.id,
+          action,
+          correlationId,
+          metadata: auditMetadata(changedFields),
+        });
+        return updated;
       });
       return new SiteResponseDto(site);
     } catch (error: unknown) {

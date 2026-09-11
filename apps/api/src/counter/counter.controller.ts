@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { CorrelatedRequest } from '../http/correlation-id.middleware.js';
 
 import {
   CounterListQueryDto,
@@ -16,8 +18,9 @@ export class CounterController {
   create(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateCounterDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<CounterResponseDto> {
-    return this.counters.create(organizationId, dto);
+    return this.counters.create(organizationId, dto, request.correlationId);
   }
 
   @Get()
@@ -41,7 +44,8 @@ export class CounterController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('counterId', ParseUUIDPipe) counterId: string,
     @Body() dto: UpdateCounterDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<CounterResponseDto> {
-    return this.counters.update(organizationId, counterId, dto);
+    return this.counters.update(organizationId, counterId, dto, request.correlationId);
   }
 }

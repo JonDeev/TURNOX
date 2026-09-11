@@ -6,11 +6,15 @@ import {
 } from '../common/resource.exceptions.js';
 import { mapPrismaWriteError } from '../database/prisma-error.mapper.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { AdminAuditService, auditMetadata } from '../audit/audit.service.js';
 import { ServiceAssignmentResponseDto } from './dto/service-assignment.dto.js';
 
 @Injectable()
 export class ServiceAssignmentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AdminAuditService,
+  ) {}
 
   async listForUser(
     organizationId: string,
@@ -28,12 +32,29 @@ export class ServiceAssignmentService {
     organizationId: string,
     userId: string,
     serviceId: string,
+    correlationId?: string,
   ): Promise<ServiceAssignmentResponseDto> {
     await this.ensureUser(organizationId, userId);
     await this.ensureService(organizationId, serviceId);
     try {
-      const assignment = await this.prisma.serviceAssignment.create({
-        data: { organizationId, userId, serviceId },
+      const assignment = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.serviceAssignment.create({
+          data: { organizationId, userId, serviceId },
+        });
+        const service = await tx.service.findUniqueOrThrow({
+          where: { id: serviceId },
+          select: { siteId: true },
+        });
+        await this.audit.record(tx, {
+          organizationId,
+          siteId: service.siteId,
+          resourceType: 'SERVICE_ASSIGNMENT',
+          resourceId: `${userId}:${serviceId}`,
+          action: 'ASSIGN',
+          correlationId,
+          metadata: auditMetadata(['userId', 'serviceId']),
+        });
+        return created;
       });
       return new ServiceAssignmentResponseDto(assignment);
     } catch (error: unknown) {
@@ -41,11 +62,39 @@ export class ServiceAssignmentService {
     }
   }
 
-  async remove(organizationId: string, userId: string, serviceId: string): Promise<void> {
-    const deleted = await this.prisma.serviceAssignment.deleteMany({
-      where: { organizationId, userId, serviceId },
-    });
-    if (deleted.count === 0) throw new ResourceNotFoundException('Service assignment');
+  async remove(
+    organizationId: string,
+    userId: string,
+    serviceId: string,
+    correlationId?: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const service = await tx.service.findFirst({
+          where: { id: serviceId, organizationId },
+          select: { siteId: true },
+        });
+        if (service === null) throw new ResourceNotFoundException('Service assignment');
+
+        const deleted = await tx.serviceAssignment.deleteMany({
+          where: { organizationId, userId, serviceId },
+        });
+        if (deleted.count === 0) throw new ResourceNotFoundException('Service assignment');
+
+        await this.audit.record(tx, {
+          organizationId,
+          siteId: service.siteId,
+          resourceType: 'SERVICE_ASSIGNMENT',
+          resourceId: `${userId}:${serviceId}`,
+          action: 'UNASSIGN',
+          correlationId,
+          metadata: auditMetadata(['userId', 'serviceId']),
+        });
+      });
+    } catch (error: unknown) {
+      if (error instanceof ResourceNotFoundException) throw error;
+      return mapPrismaWriteError(error);
+    }
   }
 
   private async ensureUser(organizationId: string, userId: string): Promise<void> {

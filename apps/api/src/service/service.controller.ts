@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { CorrelatedRequest } from '../http/correlation-id.middleware.js';
 
 import {
   CreateServiceDto,
@@ -16,8 +18,9 @@ export class ServiceController {
   create(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateServiceDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<ServiceResponseDto> {
-    return this.services.create(organizationId, dto);
+    return this.services.create(organizationId, dto, request.correlationId);
   }
 
   @Get()
@@ -41,7 +44,8 @@ export class ServiceController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('serviceId', ParseUUIDPipe) serviceId: string,
     @Body() dto: UpdateServiceDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<ServiceResponseDto> {
-    return this.services.update(organizationId, serviceId, dto);
+    return this.services.update(organizationId, serviceId, dto, request.correlationId);
   }
 }

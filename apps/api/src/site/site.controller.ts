@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Req } from '@nestjs/common';
+import type { CorrelatedRequest } from '../http/correlation-id.middleware.js';
 
 import { CreateSiteDto, SiteListQueryDto, SiteResponseDto, UpdateSiteDto } from './dto/site.dto.js';
 import { SiteService } from './site.service.js';
@@ -11,8 +13,9 @@ export class SiteController {
   create(
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() dto: CreateSiteDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<SiteResponseDto> {
-    return this.sites.create(organizationId, dto);
+    return this.sites.create(organizationId, dto, request.correlationId);
   }
 
   @Get()
@@ -36,7 +39,8 @@ export class SiteController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Param('siteId', ParseUUIDPipe) siteId: string,
     @Body() dto: UpdateSiteDto,
+    @Req() request: CorrelatedRequest,
   ): Promise<SiteResponseDto> {
-    return this.sites.update(organizationId, siteId, dto);
+    return this.sites.update(organizationId, siteId, dto, request.correlationId);
   }
 }
