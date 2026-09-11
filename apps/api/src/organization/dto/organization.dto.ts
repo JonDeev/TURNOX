@@ -1,10 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Length, Matches } from 'class-validator';
 import { PaginationQueryDto, parseBooleanQuery } from '../../common/pagination.dto.js';
 
 export class CreateOrganizationDto {
   @IsString()
   @Length(1, 160)
+  @Matches(/\S/)
   name!: string;
 }
 
@@ -12,6 +13,7 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   @Length(1, 160)
+  @Matches(/\S/)
   name?: string;
 
   @IsOptional()

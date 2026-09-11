@@ -1,4 +1,4 @@
-import { ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 
 export function mapPrismaWriteError(error: unknown): never {
@@ -18,9 +18,9 @@ export function mapPrismaWriteError(error: unknown): never {
     }
 
     if (error.code === 'P2025') {
-      throw new ConflictException({
-        code: 'RESOURCE_STATE_CONFLICT',
-        message: 'The resource could not be updated in its current state',
+      throw new NotFoundException({
+        code: 'RESOURCE_NOT_FOUND',
+        message: 'The requested resource was not found',
       });
     }
   }

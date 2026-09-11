@@ -5,6 +5,9 @@ export class ServiceAssignmentResponseDto {
   readonly createdAt!: Date;
 
   constructor(record: ServiceAssignmentResponseDto) {
-    Object.assign(this, record);
+    this.organizationId = record.organizationId;
+    this.userId = record.userId;
+    this.serviceId = record.serviceId;
+    this.createdAt = record.createdAt;
   }
 }

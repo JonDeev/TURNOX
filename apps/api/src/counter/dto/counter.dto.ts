@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 import { PaginationQueryDto, parseBooleanQuery } from '../../common/pagination.dto.js';
 
 export class CreateCounterDto {
@@ -12,6 +12,7 @@ export class CreateCounterDto {
 
   @IsString()
   @Length(1, 120)
+  @Matches(/\S/)
   name!: string;
 }
 
@@ -23,6 +24,7 @@ export class UpdateCounterDto {
   @IsOptional()
   @IsString()
   @Length(1, 120)
+  @Matches(/\S/)
   name?: string;
 
   @IsOptional()
@@ -53,6 +55,13 @@ export class CounterResponseDto {
   readonly updatedAt!: Date;
 
   constructor(record: CounterResponseDto) {
-    Object.assign(this, record);
+    this.id = record.id;
+    this.organizationId = record.organizationId;
+    this.siteId = record.siteId;
+    this.roomId = record.roomId;
+    this.name = record.name;
+    this.active = record.active;
+    this.createdAt = record.createdAt;
+    this.updatedAt = record.updatedAt;
   }
 }

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 import { PaginationQueryDto, parseBooleanQuery } from '../../common/pagination.dto.js';
 
 export class CreateServiceDto {
@@ -8,6 +8,7 @@ export class CreateServiceDto {
 
   @IsString()
   @Length(1, 160)
+  @Matches(/\S/)
   name!: string;
 }
 
@@ -19,6 +20,7 @@ export class UpdateServiceDto {
   @IsOptional()
   @IsString()
   @Length(1, 160)
+  @Matches(/\S/)
   name?: string;
 
   @IsOptional()
@@ -48,6 +50,12 @@ export class ServiceResponseDto {
   readonly updatedAt!: Date;
 
   constructor(record: ServiceResponseDto) {
-    Object.assign(this, record);
+    this.id = record.id;
+    this.organizationId = record.organizationId;
+    this.siteId = record.siteId;
+    this.name = record.name;
+    this.active = record.active;
+    this.createdAt = record.createdAt;
+    this.updatedAt = record.updatedAt;
   }
 }

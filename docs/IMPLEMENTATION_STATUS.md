@@ -2,7 +2,7 @@
 
 Último prompt: P1.3
 Fase actual: 1; siguiente: P1.4 — Autenticación, RBAC y contratos base
-Estado: FASE 1 — MODELO ORGANIZACIONAL Y CONFIGURACIÓN OPERATIVA IMPLEMENTADOS
+Estado: P1.3 — IMPLEMENTADO PERO BLOQUEADO PARA CIERRE POR VALIDACIÓN POSTGRESQL REAL
 
 ## Resultado del GATE
 
@@ -303,29 +303,35 @@ modificación y continúan diferidas a las fases indicadas.
 - Migración inicial en [`apps/api/prisma/migrations/20260910120000_initial_organizational_operational_model/migration.sql`](../apps/api/prisma/migrations/20260910120000_initial_organizational_operational_model/migration.sql), sin datos productivos y con `ON DELETE RESTRICT`.
 - CRUD administrativo mínimo y activación/desactivación mediante PATCH para organizaciones, sedes, servicios, salas, módulos, usuarios y dispositivos; asignación explícita usuario-servicio.
 - Rutas de recursos operativos anidadas bajo `/organizations/:organizationId/...`; servicios, salas, módulos, usuarios y dispositivos validan scope en el caso de uso y PostgreSQL lo refuerza con FKs compuestas organización/sede.
-- Índices para scope, estado, tipo y claves únicas por organización/sede; metadata de dispositivos limitada a JSON operativo sin pairing, secretos ni heartbeat.
+- Índices para scope, estado, tipo y claves únicas por organización/sede; el modelo de dispositivos solo tiene metadata operativa y no columnas de pairing, secretos ni heartbeat.
 - `/health/live` sigue independiente; `/health/ready` ejecuta `SELECT 1` mediante un adapter de readiness y responde `503 DATABASE_UNAVAILABLE` si PostgreSQL no está disponible.
 - Compose opcional para desarrollo en [`infra/dev/compose.yaml`](../infra/dev/compose.yaml) con PostgreSQL 18, credenciales ficticias, volumen local y healthcheck; no se agregó Redis.
+- La revisión P1.3 corrigió los DTOs de respuesta para copiar únicamente campos públicos explícitos, clasificó `P2025` como `RESOURCE_NOT_FOUND`, rechazó nombres compuestos solo por espacios y eliminó el borrado global de datos en la suite de integración.
 
 ## Validaciones de P1.3
 
-- `pnpm install --frozen-lockfile` — PASS.
+- `pnpm install --frozen-lockfile` — PASS con el lockfile sin cambios; el primer intento dentro del sandbox falló por DNS y se restauró mediante instalación aprobada.
+- `pnpm --filter @turnox/api exec prisma validate` — PASS.
+- `pnpm --filter @turnox/api exec prisma generate` — PASS.
 - `pnpm build` — PASS.
 - `pnpm lint` — PASS.
 - `pnpm typecheck` — PASS.
-- `pnpm test` — PASS: 9 tests API y suite existente del monorepo; 1 test de integración omitido sin PostgreSQL explícita.
-- `pnpm --filter @turnox/api test:integration` — PASS operativo con la suite omitida cuando no se define `RUN_INTEGRATION_TESTS=true`; con PostgreSQL real ejecuta pruebas E2E de relaciones, uniqueness y aislamiento.
+- `pnpm test` — PASS: 9 tests API y suite existente del monorepo; la suite de integración PostgreSQL aparece omitida al no habilitarse explícitamente.
+- `pnpm --filter @turnox/api test:integration` — ejecutado sin habilitación y omitido, no se considera PASS de PostgreSQL.
+- `RUN_INTEGRATION_TESTS=true ... pnpm --filter @turnox/api test:integration` — FAIL de infraestructura al conectar a `127.0.0.1:5432`; la suite no pudo ejecutar sus aserciones reales.
+- `pnpm --filter @turnox/api db:deploy` y `db:migrate` — BLOQUEADOS por ausencia de un servidor PostgreSQL disponible.
+- `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` — PASS como revisión estática del datamodel; no sustituye aplicar la migración a PostgreSQL.
 - `pnpm format:check` — PASS.
 - `git diff --check` — PASS.
-- `prisma validate` y `prisma generate` — PASS.
-- `prisma migrate deploy` desde la WSL actual — BLOQUEADO por ausencia de Docker, Podman y PostgreSQL local; el comando se ejecutó contra `127.0.0.1:5432` y no había servidor disponible. La migración queda lista para validarse desde DB vacía con `infra/dev/compose.yaml`.
+- Docker/Podman/PostgreSQL local — NO DISPONIBLE: Docker Desktop existe, pero el daemon `desktop-linux` no está iniciado; no se levantó ningún contenedor.
 
 ## Decisiones, bloqueos y deuda de P1.3
 
-- Prisma 8 estable no está publicado en el registro al momento de implementar P1.3; la última estable disponible es Prisma 7.10.0. Se usó 7.10.0 con adapter PostgreSQL, sin usar una release dev/RC de Prisma 8. Deuda: revisar upgrade al publicarse Prisma 8 estable.
+- Prisma 8 estable no está publicado en el registry consultado: `pnpm view prisma version` devolvió `8.0.0-rc.13`, mientras `pnpm view @prisma/client version` devolvió `7.10.0`. La versión final es Prisma/Client `7.10.0` con `@prisma/adapter-pg`; no se adopta una RC. Deuda: revisar upgrade cuando exista una release estable y validar generate, migrate, build, tipos y tests.
 - La autenticación, `password_hash`, roles, permisos y autorización efectiva permanecen deliberadamente para P1.4. Las rutas P1.3 usan el `organizationId` explícito de la URL como contexto de pruebas y servicio, no como autenticación.
+- La auditoría administrativa persistente prevista por V4/P1.3 no está implementada; el logging HTTP existente no la sustituye. No se agregó durante esta revisión porque la tarea prohíbe incorporar funcionalidades nuevas y aún no existe identidad/autorización de actor.
 - No se implementaron tickets, jornada, consecutivos, `AdvisorSession`, Queue Engine, realtime, Outbox, Event Log, impresión ni multimedia.
-- Bloqueo real restante: ejecutar migración desde PostgreSQL vacío y la suite de integración contra PostgreSQL real en un entorno con Docker o una instancia PostgreSQL disponible.
+- Bloqueo real: ejecutar la migración desde una base PostgreSQL vacía y la suite de integración contra PostgreSQL real. No se validaron aún en ejecución las FKs, uniques, `NOT NULL`, triggers, readiness con `SELECT 1` ni la limpieza segura de la suite.
 
 ## Próximo prompt
 

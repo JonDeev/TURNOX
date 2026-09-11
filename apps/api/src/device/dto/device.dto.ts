@@ -1,5 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsObject, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+} from 'class-validator';
 import { PaginationQueryDto, parseBooleanQuery } from '../../common/pagination.dto.js';
 import type { InputJsonObject, JsonValue } from '@prisma/client/runtime/client';
 
@@ -16,6 +25,7 @@ export class CreateDeviceDto {
 
   @IsString()
   @Length(1, 120)
+  @Matches(/\S/)
   name!: string;
 
   @IsEnum(DEVICE_TYPE_VALUES)
@@ -34,6 +44,7 @@ export class UpdateDeviceDto {
   @IsOptional()
   @IsString()
   @Length(1, 120)
+  @Matches(/\S/)
   name?: string;
 
   @IsOptional()
@@ -78,6 +89,15 @@ export class DeviceResponseDto {
   readonly updatedAt!: Date;
 
   constructor(record: DeviceResponseDto) {
-    Object.assign(this, record);
+    this.id = record.id;
+    this.organizationId = record.organizationId;
+    this.siteId = record.siteId;
+    this.roomId = record.roomId;
+    this.name = record.name;
+    this.type = record.type;
+    this.enabled = record.enabled;
+    this.metadata = record.metadata;
+    this.createdAt = record.createdAt;
+    this.updatedAt = record.updatedAt;
   }
 }
