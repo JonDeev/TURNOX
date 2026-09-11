@@ -11,6 +11,7 @@
 
 ---
 
+
 ## CÓMO USAR ESTE DOCUMENTO
 
 Las secciones marcadas como **DECISIÓN CERRADA** incluyen su razón. No se cambian sin una razón técnica más fuerte que la registrada, y todo cambio queda documentado como ADR (sección 52).
@@ -81,7 +82,7 @@ Esta sección condiciona varias decisiones de arquitectura. **Un punto solo se c
 
 ## 2.1 Atril / kiosco — CONFIRMADO
 
-- Mini-PC con sistema operativo **Linux (Ubuntu)**.
+- Mini-PC con **Ubuntu Desktop endurecido**.
 - Pantalla táctil.
 - Impresora térmica POS conectada por USB.
 
@@ -192,6 +193,10 @@ Cada decisión incluye su razón. Sin la razón registrada, cualquiera puede rev
 ## 3.5 Kiosco — DECISIÓN CERRADA
 
 El kiosco de toma de turnos será **WEB**, no una APK Android.
+
+La distribución seleccionada para el atril es **Ubuntu Desktop endurecido**. Ubuntu Server + compositor kiosco (`cage`) + Chromium fue considerada como alternativa, pero no es la plataforma seleccionada. Esta decisión no convierte en PASS las validaciones físicas del equipo real.
+
+La aplicación React del kiosco permanece separada del sistema operativo. El Print Agent continúa siendo un servicio local independiente; no forma parte de Chromium ni del escritorio.
 
 - React + TypeScript + Vite.
 - Bundle y despliegue separados de la consola administrativa.
@@ -2076,10 +2081,12 @@ Antes de desarrollo avanzado del kiosco y de la pantalla, validar físicamente *
 - Montaje automático de USB desactivado.
 - Inicio de sesión automático configurado.
 
-**Decisión sobre la distribución — PENDIENTE, resolver en Fase 0:**
+**Decisión sobre la distribución — DECISIÓN CERRADA:**
 
-- **Opción A:** Ubuntu Server + compositor kiosco (`cage`) + Chromium. Sin escritorio. El atril queda como un electrodoméstico. Recomendada si TURNOX se comercializa o si el atril vivirá sin supervisión técnica.
-- **Opción B:** Ubuntu Desktop endurecido. Más familiar de mantener, pero requiere desactivar explícitamente todo lo anterior y sigue expuesto a que GNOME muestre algo encima.
+- **Seleccionada — Ubuntu Desktop endurecido + Chromium:** más familiar de mantener, pero requiere desactivar explícitamente todo lo anterior y sigue expuesto a que GNOME muestre algo encima. Debe operar como sesión dedicada, no como escritorio normal para el público.
+- **Alternativa no seleccionada — Ubuntu Server + compositor kiosco (`cage`) + Chromium:** sin escritorio; el atril queda como un electrodoméstico. Se conserva el razonamiento histórico porque podría ofrecer menor superficie operativa si una decisión posterior revisara la plataforma.
+
+La decisión fue confirmada explícitamente por el responsable del proyecto el 2026-09-10. Autologin real, endurecimiento efectivo, touchscreen, GPU/driver, monitor, BIOS, recuperación eléctrica, red, DNS/TLS/NTP y demás capacidades físicas permanecen pendientes de validación sobre el equipo real.
 
 ## 53.2 Impresora POS
 
@@ -2402,15 +2409,13 @@ Una decisión solo puede figurar como **CONFIRMADA** si fue confirmada explícit
 
 ## Resueltas
 
-- ~~¿Qué sistema operativo tendrá el atril?~~ **Linux (Ubuntu).** Falta decidir entre Server + `cage` o Desktop endurecido (sección 53.1).
+- ~~¿Qué sistema operativo tendrá el atril?~~ **Ubuntu Desktop endurecido + Chromium en modo kiosco.** Ubuntu Server + `cage` fue considerada y queda no seleccionada. La decisión fue confirmada por el responsable del proyecto el 2026-09-10; la validación física del atril continúa pendiente (sección 53.1).
 - ~~¿Los televisores son Android TV, Google TV, Tizen o webOS?~~ **TV Box Android TV / Google TV**, si esto fue confirmado por el responsable del proyecto. El modelo exacto y el mecanismo de modo dedicado quedan para Fase 0.
 
 ## Abiertas — bloquean Fase 0
 
 1. Marca y modelo exactos de la impresora POS.
 2. Confirmar conexión USB y que el modelo reporte estado de papel.
-3. Distribución exacta del atril: Ubuntu Server + `cage`, o Ubuntu Desktop endurecido.
-
 ## Abiertas — políticas operativas que deben cerrarse antes de Fase 2
 
 - Duración de la gracia para recuperar una `AdvisorSession` con turno activo.
@@ -2564,4 +2569,3 @@ Estos aspectos no pueden ser frágiles:
 **La arquitectura debe proteger estos invariantes desde el primer día y cada criterio importante debe demostrarse mediante pruebas, no solo mediante intención documental.**
 
 ---
-

@@ -1,6 +1,6 @@
 # Decisión de plataforma del kiosco
 
-La decisión documental del proyecto es **Opción B — Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable el 2026-09-10. La validación sobre hardware real sigue pendiente; por ello esta decisión no convierte ninguna prueba física en `PASS`. La Opción A se conserva como alternativa no activa.
+La decisión del proyecto está **CERRADA**: **Opción B — Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable el 2026-09-10. La validación sobre hardware real sigue pendiente; por ello esta decisión no convierte ninguna prueba física en `PASS`. La Opción A se conserva como alternativa no activa.
 
 | Criterio | Opción A — Ubuntu Server + `cage` (no activa) | Opción B — Ubuntu Desktop endurecido (seleccionada) |
 |---|---|---|
@@ -22,4 +22,4 @@ La decisión documental del proyecto es **Opción B — Ubuntu Desktop endurecid
 - Recuperación tras corte eléctrico con BIOS en `Restore on AC Power Loss = Power On`.
 - Mantenimiento, actualización y diagnóstico ejecutados por el responsable de soporte.
 
-Hasta obtener esa evidencia, la selección de Opción B es documental; HW-01 a HW-08 permanecen `PENDIENTE` y no debe habilitarse el perfil Server + `cage`.
+La selección de Opción B está cerrada. Hasta obtener esa evidencia, HW-01 a HW-08 permanecen `PENDIENTE` y no debe habilitarse el perfil Server + `cage`.

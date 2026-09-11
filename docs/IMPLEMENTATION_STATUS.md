@@ -1,7 +1,7 @@
 # TURNOX — Implementation Status
 
-Último prompt: P0.2 — Baseline Linux del kiosco
-Fase actual: 0 — Hardware e infraestructura  
+Último prompt: P0.2 — Cierre formal de decisión del atril
+Fase actual: 0 — Hardware e infraestructura
 Estado: BLOQUEADO
 
 ## Punto real de inicio
@@ -36,6 +36,8 @@ Estado: BLOQUEADO
 ## ADR / decisiones
 
 - La fuente de verdad arquitectónica continúa siendo V4.
+- La decisión del atril está cerrada: Ubuntu Desktop endurecido + Chromium en modo kiosco. Se conserva Ubuntu Server + `cage` únicamente como alternativa histórica no seleccionada.
+- ADR específico: [`docs/adr/ADR-019-kiosk-ubuntu-desktop.md`](adr/ADR-019-kiosk-ubuntu-desktop.md).
 - Los 18 ADR iniciales enumerados en V4 §52 todavía no están redactados; quedan pendientes de los prompts de implementación correspondientes o de una tarea explícita de documentación.
 - La referencia de V4 a un `turnox-platform/docs/adr/` no coincide con el repositorio actual, que aún no contiene `turnox-platform/`. Se conserva la decisión de monolito modular como requisito documental, sin asumir que exista una implementación.
 
@@ -46,7 +48,7 @@ Estado: BLOQUEADO
 - No existe una unidad física validada de cada componente: mini-PC/atril, pantalla táctil, impresora POS, TV Box/televisor, red y UPS.
 - Falta seleccionar y validar la marca/modelo exactos de la impresora POS.
 - Falta confirmar USB, ESC/POS, cortador y realimentación de estado de papel/tapa/offline de la POS.
-- La variante documental del atril quedó confirmada como Ubuntu Desktop endurecido + Chromium; falta validarla físicamente y demostrar la sesión dedicada.
+- La variante del atril quedó confirmada como **DECISIÓN CERRADA**: Ubuntu Desktop endurecido + Chromium; falta validarla físicamente y demostrar la sesión dedicada.
 - Falta seleccionar y validar el TV Box real y su mecanismo de dispositivo dedicado/autoarranque (launcher, Device Owner/Lock Task, MDM u otra opción soportada).
 - Falta validar físicamente calibración táctil, Chromium kiosco, regla udev, impresión, Ethernet, HDMI/overscan, audio, almacenamiento, autoarranque y recuperación tras cortes.
 - Falta validar conectividad LAN, operación sin Internet externo y latencia básica extremo a extremo.
@@ -90,7 +92,7 @@ Estado: BLOQUEADO
 
 ## Entregado en P0.2 — baseline del kiosco Linux
 
-- Se confirmó Opción B (`Ubuntu Desktop endurecido + Chromium`) como perfil activo; Opción A (`Ubuntu Server + cage + Chromium`) permanece versionada como alternativa no activa.
+- Se confirmó y cerró Opción B (`Ubuntu Desktop endurecido + Chromium`) como perfil activo; Opción A (`Ubuntu Server + cage + Chromium`) permanece versionada como alternativa no activa.
 - Se prepararon plantillas para configuración externa, servicio systemd de Chromium, servicio systemd con `cage`, perfil candidato de endurecimiento Desktop, configuración de hostname y zona horaria/NTP LAN.
 - Se documentaron start, stop, status, logs, recuperación, rollback, BIOS y validaciones que requieren acceso físico.
 - El instalador es deliberadamente conservador: crea el usuario dedicado y archivos del baseline, conserva una configuración existente y no instala paquetes, habilita servicios ni toca BIOS.
@@ -101,6 +103,7 @@ Estado: BLOQUEADO
 - Estructura revisada con `find` y estado Git; solo se añadieron `infra/kiosk/` y cambios documentales solicitados.
 - Se ejecutaron comprobaciones sintácticas de Bash. `systemd-analyze verify` no reportó errores de sintaxis de las unidades; su validación completa quedó limitada porque las rutas `/usr/local/libexec/turnox-kiosk/*` solo existen después de ejecutar el instalador en Ubuntu real.
 - Se comprobó que no hay URL real, IP, certificado, credencial o secreto embebido en el baseline.
+- Se verificó consistencia entre V4, ADR-019, `OPTION_DECISION.md`, el baseline y la matriz de hardware: decisión cerrada, validaciones físicas pendientes.
 - No se ejecutó `install.sh`, `configure-hostname.sh`, `configure-time.sh` ni ninguna activación sobre un mini-PC real.
 - HW-01 a HW-08 continúan `PENDIENTE`; la actualización de HW-08 no marca ninguna prueba física como `PASS`.
 

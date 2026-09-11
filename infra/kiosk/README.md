@@ -6,7 +6,7 @@ Este directorio prepara el baseline reproducible del futuro atril Linux de TURNO
 
 No contiene TURNOX Kiosk, React, Print Agent, infraestructura de TURNOX ni paquetes instalables. La URL debe apuntar a una aplicación real únicamente después de que el equipo y la red hayan sido validados.
 
-La decisión documental actual es **Opción B — Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable del proyecto. La validación física de la unidad todavía está pendiente. La Opción A se conserva como alternativa técnica no activa para comparación y rollback de decisión.
+La decisión actual está **CERRADA**: **Opción B — Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable del proyecto. La validación física de la unidad todavía está pendiente. La Opción A se conserva como alternativa técnica no activa para comparación histórica.
 
 - **Opción A — Ubuntu Server + `cage` + Chromium:** alternativa no seleccionada.
 - **Opción B — Ubuntu Desktop endurecido + Chromium:** opción seleccionada, pendiente de validación física.
