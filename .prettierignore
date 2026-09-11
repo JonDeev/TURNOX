@@ -1,0 +1,6 @@
+# Existing operational and source-of-truth documents keep their established format.
+CONTEXTO_MAESTRO_TURNOX_V4.md
+PROMPTS_IMPLEMENTACION_TURNOX_V4.md
+docs/
+infra/
+pnpm-lock.yaml

@@ -107,14 +107,15 @@ La configuración no contiene credenciales. El hostname, DNS, PKI/TLS, NTP, RPO/
 
 ### Opción B — Desktop endurecido (perfil activo)
 
-Después de preparar autologin, GNOME y los perfiles de endurecimiento en el mini-PC real, instalar y habilitar solo:
+Después de preparar autologin, GNOME y los perfiles de endurecimiento en el mini-PC real, la instalación deja la unidad Desktop en el ámbito global de unidades de usuario (`/etc/systemd/user/`). Habilitarla desde la sesión del usuario dedicado:
 
 ```sh
-install -D -m 0644 infra/kiosk/systemd/turnox-kiosk-desktop.service \
-  "$HOME/.config/systemd/user/turnox-kiosk-desktop.service"
 systemctl --user daemon-reload
 systemctl --user enable --now turnox-kiosk-desktop.service
 ```
+
+La unidad Desktop no debe instalarse ni habilitarse como servicio del system
+manager: depende de la sesión gráfica autenticada del usuario `turnox-kiosk`.
 
 ### Opción A — Server + `cage` (alternativa no activa)
 

@@ -6,6 +6,7 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 CONFIG_DIR=/etc/turnox
 LIBEXEC_DIR=/usr/local/libexec/turnox-kiosk
 SYSTEMD_DIR=/etc/systemd/system
+SYSTEMD_USER_DIR=/etc/systemd/user
 USER_NAME=turnox-kiosk
 
 command -v install >/dev/null || { printf 'install no está disponible.\n' >&2; exit 1; }
@@ -38,11 +39,12 @@ else
 fi
 
 install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
+install -d -o root -g root -m 0755 "$SYSTEMD_USER_DIR"
 for script in validate-config.sh launch-chromium.sh launch-cage.sh; do
   install -o root -g root -m 0755 "$ROOT_DIR/scripts/$script" "$LIBEXEC_DIR/$script"
 done
 install -o root -g root -m 0644 "$ROOT_DIR/systemd/turnox-kiosk-cage.service" "$SYSTEMD_DIR/turnox-kiosk-cage.service"
-install -o root -g root -m 0644 "$ROOT_DIR/systemd/turnox-kiosk-desktop.service" "$SYSTEMD_DIR/turnox-kiosk-desktop.service"
+install -o root -g root -m 0644 "$ROOT_DIR/systemd/turnox-kiosk-desktop.service" "$SYSTEMD_USER_DIR/turnox-kiosk-desktop.service"
 systemctl daemon-reload
 
 printf '%s\n' 'Baseline instalado. Ninguna opción fue habilitada.'

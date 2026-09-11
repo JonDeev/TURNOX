@@ -12,7 +12,7 @@ fi
 
 systemctl disable --now turnox-kiosk-cage.service 2>/dev/null || true
 systemctl daemon-reload
-rm -f /etc/systemd/system/turnox-kiosk-cage.service /etc/systemd/system/turnox-kiosk-desktop.service
+rm -f /etc/systemd/system/turnox-kiosk-cage.service /etc/systemd/user/turnox-kiosk-desktop.service
 rm -f /usr/local/libexec/turnox-kiosk/validate-config.sh
 rm -f /usr/local/libexec/turnox-kiosk/launch-chromium.sh
 rm -f /usr/local/libexec/turnox-kiosk/launch-cage.sh

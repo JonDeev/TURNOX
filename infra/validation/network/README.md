@@ -107,4 +107,4 @@ realtime, Display y captura correlacionable. Medir posteriormente:
 
 Registrar un identificador de evento, timestamps monotónicos y de pared en cada
 salto, al menos 30 muestras, pérdida/duplicación y p50/p95/máximo. Estado de
-aceptación: `PENDIENTE — UMBRAL POR DEFINIR / MEDIR EN PILOTO`.
+aceptación: `PENDIENTE — MEDIR EN INTEGRACIÓN/PILOTO`. No inventar un umbral.

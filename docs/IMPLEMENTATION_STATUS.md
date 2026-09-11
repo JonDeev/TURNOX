@@ -1,8 +1,22 @@
 # TURNOX — Implementation Status
 
-Último prompt: P0.3 — Metodología de validación física e infraestructura
-Fase actual: 0 — Hardware e infraestructura
-Estado: BLOQUEADO
+Último prompt: P1.1
+Fase actual: 1; siguiente: P1.2 — Bootstrap de API y configuración
+Estado: FASE 1 — FUNDACIÓN TÉCNICA COMPLETADA
+
+## Resultado del GATE
+
+**FASE 0 — CERRADA PARA DESARROLLO.** TURNOX puede avanzar a `P1.1 —
+Monorepo y tooling base`.
+
+**VALIDACIONES FÍSICAS PENDIENTES — OBLIGATORIAS ANTES DE LAS FASES/PILOTO
+CORRESPONDIENTES.** No se registra Fase 0 como completamente validada: no
+existe evidencia física de los equipos, sede o infraestructura final.
+
+No se encontró un bloqueador técnico real para iniciar software desacoplado.
+Las validaciones físicas pendientes bloquean las integraciones que las
+consumen y el piloto, no el monorepo, los contratos base ni el desarrollo con
+ports/adapters, configuración externa y fake/test adapters.
 
 ## Punto real de inicio
 
@@ -26,7 +40,7 @@ Estado: BLOQUEADO
 ## Validaciones
 
 - Estructura inspeccionada con listado completo de archivos y directorios del repositorio.
-- Historial Git revisado: un único commit de documentación en `master`, alineado con `origin/master`.
+- En el punto inicial se observó un único commit de documentación en `master`, alineado con `origin/master`.
 - No se ejecutaron lint, typecheck ni tests: no existe todavía código o tooling ejecutable.
 - No se modificaron dominio, tablas de tickets, autenticación ni funcionalidades.
 - No se ejecutaron pruebas físicas ni de infraestructura: no hay acceso a los equipos, sede, LAN, DNS, PKI/TLS, NTP ni UPS.
@@ -41,54 +55,118 @@ Estado: BLOQUEADO
 - Los 18 ADR iniciales enumerados en V4 §52 todavía no están redactados; quedan pendientes de los prompts de implementación correspondientes o de una tarea explícita de documentación.
 - La referencia de V4 a un `turnox-platform/docs/adr/` no coincide con el repositorio actual, que aún no contiene `turnox-platform/`. Se conserva la decisión de monolito modular como requisito documental, sin asumir que exista una implementación.
 
-## Bloqueos y pendientes reales para Fase 0–2
+## Clasificación de pendientes
 
-### Bloquean el cierre de Fase 0
+### No bloquea desarrollo
 
-- No existe una unidad física validada de cada componente: mini-PC/atril, pantalla táctil, impresora POS, TV Box/televisor, red y UPS.
-- Falta seleccionar y validar la marca/modelo exactos de la impresora POS.
-- Falta confirmar USB, ESC/POS, cortador y realimentación de estado de papel/tapa/offline de la POS.
-- El perfil de despliegue V1 del atril quedó confirmado como **DECISIÓN CERRADA**: Ubuntu Desktop endurecido + Chromium; falta validarlo físicamente y demostrar la sesión dedicada.
-- Falta seleccionar y validar el TV Box real y su mecanismo de dispositivo dedicado/autoarranque (launcher, Device Owner/Lock Task, MDM u otra opción soportada).
-- Falta validar físicamente calibración táctil, Chromium kiosco, regla udev, impresión, Ethernet, HDMI/overscan, audio, almacenamiento, autoarranque y recuperación tras cortes.
-- Falta validar conectividad LAN, operación sin Internet externo y latencia básica extremo a extremo.
-- Falta definir y validar el nombre DNS interno, estrategia PKI/TLS, trust en Chromium/Android y NTP local.
-- Falta cerrar la autonomía/protección base de UPS con infraestructura; RPO y RTO deben acordarse con operación antes del piloto y bloquearán la validación de recuperación, no la selección física de la unidad.
+- Disponibilidad temporal del atril, touchscreen, impresora POS, TV Box,
+  Smart TV, red física, UPS y hardware final del mueble: validación diferida.
+- Redacción de los 18 ADR iniciales aún no redactados: trabajo documental que
+  no impide `P1.1`; deben redactarse cuando corresponda a cada decisión.
+- `NET-07` — rotación de credenciales: recomendado; resolver antes del piloto.
+- `TV-09` — HDMI-CEC: capacidad opcional; resolver antes del piloto solo si la
+  sede la requiere; en caso contrario registrar `NO_APLICA` con justificación.
+- RPO/RTO: no se inventan ni bloquean `P1.1`; resolver antes de hardening y
+  piloto.
 
-### Bloquean Fase 1 y/o Fase 2 según V4 §60
+### Resolver antes de Fase 5
 
-- Definir si un módulo anuncia hacia una sola sala o hacia varias.
-- Definir prefijos de servicios.
-- Definir el alcance del reinicio de consecutivos: diariamente, por día operativo, sede o servicio.
-- Definir el máximo de rellamados antes de `NO_PRESENTADO`.
-- Definir si `NO_PRESENTADO` vuelve a la cola con prioridad degradada o sale definitivamente.
-- Definir origen de las prioridades: kiosco, personal u otro sistema.
-- Definir si el kiosco solicita solo servicio o también documento de identidad.
-- Definir horario del día operativo por sede.
-- Definir el tiempo de inactividad para cerrar una sesión de asesor huérfana.
+- Impresora POS real y modelo exacto.
+- Vendor ID/Product ID USB obtenidos del equipo real y regla udev específica.
+- USB estable, ESC/POS, corte, legibilidad, estados de papel/tapa/offline y
+  recuperación de impresión.
 
-### Políticas que deben cerrarse antes de implementar el motor de turnos
+### Resolver antes de Fase 6
 
-- Gracia para recuperar una `AdvisorSession` con turno activo.
-- Resolución de un turno `LLAMADO` cuando el asesor no regresa.
-- `announcement_ttl` por defecto.
-- Cobertura cuando espera y destino están en salas distintas.
-- Prioridad/antigüedad al transferir.
-- Definición institucional de abandono.
-- Retención del Event Log y de los command receipts.
+- TV Box Android real y mecanismo de dispositivo dedicado/autoarranque.
+- Android, Ethernet del box, HDMI/overscan, audio sobre video,
+  almacenamiento y recuperación del Display.
 
-### No bloqueantes identificados por V4
+### Resolver antes del piloto
 
-- Integraciones externas y modalidad de SSO/usuarios compartidos.
-- ORM utilizado por otros sistemas de la organización.
-- Decisión comercial sobre producto/multi-tenant completo.
+- Atril/mini-PC, Ubuntu Desktop como perfil V1, autologin, Chromium kiosco,
+  touchscreen/calibración, navegación lateral, sesión endurecida y
+  recuperación tras reinicio.
+- DNS interno, PKI/TLS/trust definitivo, NTP LAN y operación sin Internet.
+- BIOS `Restore on AC Power Loss`, UPS, recuperación eléctrica, respaldos y
+  restauración, contingencia manual, RPO/RTO y latencia extremo a extremo.
 
-### Estado de pruebas y errores detectados en P0.1
+### Bloquea Fase 1
 
-- No se detectaron errores físicos: no fue posible ejecutar pruebas físicas ni simular cortes, desconexiones o carga de red.
-- Se detectó como bloqueo de evidencia la ausencia de inventario real de equipos y de una sede de prueba disponible.
-- Se detectó que varias decisiones que V4 marca como pendientes —impresora, TV Box, DNS/PKI/TLS, UPS, RPO y RTO— no pueden cerrarse desde documentación o recomendación de IA. La selección de Ubuntu Desktop fue confirmada explícitamente por el responsable, pero aún requiere evidencia física.
-- La matriz no autoriza marcar una capacidad como confirmada sin evidencia primaria de la unidad y configuración probadas.
+V4 §60 marca explícitamente como bloqueantes de Fase 1/Fase 2 las siguientes
+decisiones de dominio y operación. No bloquean el alcance acotado de `P1.1`,
+pero deben cerrarse antes de implementar los casos de uso y modelos que
+dependan de ellas:
+
+- Cobertura de anuncio de un módulo: una sala o varias.
+- Prefijos de servicios.
+- Reinicio de consecutivos: día calendario, día operativo, sede o servicio.
+- Máximo de rellamados antes de `NO_PRESENTADO`.
+- Política posterior de `NO_PRESENTADO`.
+- Origen de prioridades.
+- Si el kiosco solicita solo servicio o también documento de identidad.
+- Horario del día operativo por sede.
+- Tiempo de inactividad para cerrar una sesión de asesor huérfana.
+
+También deben cerrarse antes de Fase 2 las políticas de gracia de
+`AdvisorSession`, resolución de `LLAMADO`, `announcement_ttl`, cobertura,
+prioridad/antigüedad de transferencias, definición institucional de abandono y
+retención de Event Log/command receipts.
+
+### Latencia
+
+`PENDIENTE — MEDIR EN INTEGRACIÓN/PILOTO`. Todavía no existe el sistema
+completo para medir `asesor -> API -> realtime -> Display -> inicio
+visual/sonoro`; no se fija ni se inventa un umbral.
+
+## Bloqueadores reales
+
+Ninguno para iniciar `P1.1`.
+
+Los `PENDIENTE` de HW/infraestructura son evidencia y preparación operativa
+diferidas. Un `FAIL` futuro bloqueará la integración o el piloto afectado,
+pero su ausencia actual no hace incorrecto construir el software desacoplado.
+
+## Decisiones arquitectónicas cerradas
+
+- TURNOX Kiosk = aplicación web React + TypeScript + Vite.
+- Chromium = runtime web del kiosco V1.
+- Ubuntu Desktop endurecido = perfil de despliegue inicial V1 del atril; no es
+  dependencia de TURNOX Kiosk.
+- Print Agent = servicio separado para integración local de impresión.
+- TURNOX Display = aplicación Android independiente.
+- Impresión y Android permanecen detrás de adapters/ports; la lógica de
+  negocio no dependerá directamente de `/dev/usb/...`, udev, Android,
+  fabricante POS, modelo de TV Box ni Ubuntu Desktop.
+
+## Defectos encontrados y corregidos en P0.GATE
+
+- La matriz hacía que `PASS` físico fuera requisito de entrada a toda Fase 1.
+  Se corrigió para permitir `P1.1` y exigir la evidencia solo antes de la
+  integración física correspondiente.
+- `install.sh` instalaba la unidad Ubuntu Desktop en el system manager,
+  aunque el servicio depende de la sesión gráfica y el runbook lo operaba como
+  unidad de usuario. Se corrigió para instalarla en `/etc/systemd/user/`; el
+  servicio `cage` alternativo permanece en el ámbito del system manager.
+- El texto de latencia se corrigió a `PENDIENTE — MEDIR EN
+  INTEGRACIÓN/PILOTO`, sin umbral inventado.
+
+## Validaciones del GATE
+
+- `bash -n` sobre todos los scripts de Kiosk y validación.
+- `systemd-analyze verify` sobre ambas unidades declarativas: no emitió
+  diagnósticos de unidad, pero el runner restringido devolvió código 1 por
+  errores de permisos en sus sockets; queda pendiente repetirlo en Ubuntu real.
+- `git diff --check` sobre la base de Fase 0 y el árbol de trabajo.
+- Revisión de permisos de archivos: scripts ejecutables `0755`; documentos,
+  configuraciones de ejemplo y unidades `0644`.
+- Búsqueda de secretos, credenciales, certificados privados, IPs/hostnames de
+  sede, Vendor IDs/Product IDs reales, flags TLS inseguros y rutas de dispositivo
+  hardcodeadas.
+- Revisión de referencias internas, configuración externa, systemd,
+  idempotencia/rollback documentados y separación de responsabilidades.
+- No se ejecutaron pruebas físicas ni se marcaron capacidades de hardware como
+  `PASS`.
 
 ## Entregado en P0.2 — baseline del perfil Linux/Ubuntu V1 del atril
 
@@ -133,11 +211,51 @@ Estado: BLOQUEADO
 - No se ejecutaron cortes eléctricos, desconexiones de uplink, pruebas USB,
   ESC/POS, Android, DNS, PKI/TLS, NTP ni latencia extremo a extremo: requieren
   hardware, red y responsables disponibles.
-- La latencia extremo a extremo sigue explícitamente
-  `PENDIENTE — UMBRAL POR DEFINIR / MEDIR EN PILOTO`; no se inventó un PASS.
-- P0.3 queda completado documentalmente. Fase 0 sigue bloqueada hasta obtener
-  evidencia física y cerrar las decisiones de infraestructura pendientes.
+- La latencia extremo a extremo queda explícitamente
+  `PENDIENTE — MEDIR EN INTEGRACIÓN/PILOTO`; no se inventó un umbral ni un
+  PASS.
+- P0.3 queda completado documentalmente. El GATE cierra Fase 0 para desarrollo;
+  la validación física y las decisiones de infraestructura siguen pendientes
+  hasta las fases y el piloto indicados arriba.
+
+## Entregado en P1.1 — fundación técnica del monorepo
+
+- Se creó el monorepo `turnox-platform` con `apps/api`, `apps/console`,
+  `apps/kiosk`, `apps/print-agent`, `packages/contracts`, `packages/ui`,
+  `packages/config` e `infra/` existente preservado.
+- Se configuraron pnpm workspaces, catálogo de versiones, Turbo, TypeScript
+  strict, ESLint flat config y Prettier compartidos.
+- Se definió Node.js `24.20.0` mediante `.nvmrc` y `engines`, junto con
+  `packageManager: pnpm@12.3.4` y lockfile reproducible.
+- Se añadió el bootstrap mínimo de NestJS/Express para API, los shells React +
+  Vite de Console y Kiosk, y el entrypoint TypeScript del Print Agent.
+- `packages/contracts` y `packages/ui` quedan como skeletons sin modelos de
+  negocio ni componentes prematuros. Android Display permanece fuera del
+  monorepo.
+- No se implementaron dominio, autenticación, base de datos, Prisma, realtime,
+  impresión, USB, Android ni lógica funcional.
+
+## Validaciones de P1.1
+
+- Instalación limpia: `pnpm install --frozen-lockfile` — PASS.
+- `pnpm build` — PASS; API, Console, Kiosk, Print Agent, contracts y UI
+  compilan.
+- `pnpm lint` — PASS.
+- `pnpm typecheck` — PASS con TypeScript strict.
+- `pnpm test` — PASS; pruebas de shell de Console/Kiosk y compilación del
+  módulo raíz de API; packages y Print Agent sin tests artificiales.
+- Smoke checks de ejecución: API Nest inicia, Print Agent ejecuta su entrypoint
+  y Console/Kiosk levantan Vite.
+- `pnpm dedupe --check` — PASS; catálogo y lockfile sin duplicación evitable.
+- `git diff --check` — PASS.
+- Revisión de estructura, imports y secretos: sin credenciales, tokens,
+  certificados privados, `.env` versionado ni acceso de Kiosk a Ubuntu/USB.
+
+## Bloqueos de P1.1
+
+Ninguno. Las validaciones físicas pendientes de Fase 0 se conservan sin
+modificación y continúan diferidas a las fases indicadas.
 
 ## Próximo prompt
 
-P0.GATE — Revisión de evidencia y cierre de decisiones de Fase 0; no ejecutado.
+P1.2 — Bootstrap de API y configuración
