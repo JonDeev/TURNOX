@@ -1,0 +1,16 @@
+# PLANTILLA NO INSTALABLE. No contiene IDs válidos.
+#
+# Completar solo después de ejecutar inspect-linux.sh y revisar udevadm info en
+# la impresora física. Sustituir TODOS los marcadores por atributos observados,
+# añadir una condición inequívoca adicional cuando exista, y revisar la regla
+# con el responsable de infraestructura. Nunca adivinar idVendor/idProduct.
+#
+# Ejemplo de forma, no de configuración:
+# ACTION=="add", KERNEL=="__VALIDATED_KERNEL_NAME__", \
+#   ATTRS{idVendor}=="__OBSERVED_VENDOR_ID__", \
+#   ATTRS{idProduct}=="__OBSERVED_PRODUCT_ID__", \
+#   ENV{ID_SERIAL_SHORT}=="__OBSERVED_SERIAL_IF_PRESENT__", \
+#   SYMLINK+="turnox-printer-__APPROVED_UNIT_NAME__"
+#
+# No instalar este archivo ni crear el symlink hasta validar la coincidencia,
+# permisos, reconexión en 5 ciclos y ausencia de colisiones.

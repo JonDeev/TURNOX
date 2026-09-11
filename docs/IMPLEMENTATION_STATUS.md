@@ -1,6 +1,6 @@
 # TURNOX — Implementation Status
 
-Último prompt: P0.2 — Cierre formal de decisión del atril
+Último prompt: P0.3 — Metodología de validación física e infraestructura
 Fase actual: 0 — Hardware e infraestructura
 Estado: BLOQUEADO
 
@@ -107,6 +107,37 @@ Estado: BLOQUEADO
 - No se ejecutó `install.sh`, `configure-hostname.sh`, `configure-time.sh` ni ninguna activación sobre un mini-PC real.
 - HW-01 a HW-08 continúan `PENDIENTE`; la actualización de HW-08 no marca ninguna prueba física como `PASS`.
 
+## Entregado en P0.3 — metodología reproducible de Fase 0
+
+- Se creó [`infra/validation/`](../infra/validation/) con configuración externa,
+  hoja de evidencia y procedimientos separados para red, impresora, Display y
+  reloj.
+- Se prepararon utilidades pequeñas para DNS, conectividad LAN/TCP, latencia
+  ICMP, TLS con validación normal, reloj/NTP Linux, inventario Android
+  autorizado, inspección USB/udev y transmisión mínima ESC/POS.
+- La prueba ESC/POS es independiente del futuro Print Agent y no implementa
+  `PrinterAdapter`; el inventario Android es diagnóstico y no selecciona el
+  mecanismo final de dispositivo dedicado.
+- Se añadió una plantilla parametrizada de udev que no contiene Vendor ID,
+  Product ID ni ruta real y que no es instalable sin evidencia de la impresora.
+- Se actualizaron los vínculos y procedimientos de
+  [`docs/pilot/HARDWARE_VALIDATION.md`](pilot/HARDWARE_VALIDATION.md). Todos
+  los resultados físicos e infraestructura permanecen `PENDIENTE`.
+
+## Validaciones de P0.3
+
+- Se ejecutaron comprobaciones estáticas de sintaxis Bash y revisión de
+  permisos/estructura del kit; no se ejecutaron scripts contra equipos reales.
+- Se revisó que el kit no contenga IPs, hostnames de sede, credenciales,
+  certificados, Vendor IDs o Product IDs reales, ni opciones de bypass TLS.
+- No se ejecutaron cortes eléctricos, desconexiones de uplink, pruebas USB,
+  ESC/POS, Android, DNS, PKI/TLS, NTP ni latencia extremo a extremo: requieren
+  hardware, red y responsables disponibles.
+- La latencia extremo a extremo sigue explícitamente
+  `PENDIENTE — UMBRAL POR DEFINIR / MEDIR EN PILOTO`; no se inventó un PASS.
+- P0.3 queda completado documentalmente. Fase 0 sigue bloqueada hasta obtener
+  evidencia física y cerrar las decisiones de infraestructura pendientes.
+
 ## Próximo prompt
 
-P0.3 — Validación física del atril Ubuntu Desktop e infraestructura únicamente con equipos y responsables disponibles.
+P0.GATE — Revisión de evidencia y cierre de decisiones de Fase 0; no ejecutado.
