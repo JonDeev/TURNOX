@@ -1,15 +1,15 @@
-# TURNOX Kiosk — baseline Linux
+# TURNOX Kiosk — Linux/Ubuntu deployment profile
 
 ## Propósito
 
-Este directorio prepara el baseline reproducible del futuro atril Linux de TURNOX. Define un usuario dedicado, configuración externa, lanzamiento de Chromium en modo kiosco, recuperación mediante systemd, configuración de hostname/tiempo y procedimientos operativos.
+Este directorio prepara el baseline reproducible del perfil de despliegue Linux/Ubuntu del atril TURNOX. Para V1, ese perfil es Ubuntu Desktop endurecido + Chromium en modo kiosco. Define un usuario dedicado, configuración externa, lanzamiento del navegador, recuperación mediante systemd, configuración de hostname/tiempo y procedimientos operativos.
 
-No contiene TURNOX Kiosk, React, Print Agent, infraestructura de TURNOX ni paquetes instalables. La URL debe apuntar a una aplicación real únicamente después de que el equipo y la red hayan sido validados.
+No contiene TURNOX Kiosk, React, Print Agent, infraestructura de TURNOX ni paquetes instalables. TURNOX Kiosk continúa siendo una aplicación web independiente del sistema operativo; este directorio describe únicamente su perfil de despliegue V1. La URL debe apuntar a una aplicación real únicamente después de que el equipo y la red hayan sido validados.
 
-La decisión actual está **CERRADA**: **Opción B — Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable del proyecto. La validación física de la unidad todavía está pendiente. La Opción A se conserva como alternativa técnica no activa para comparación histórica.
+La decisión del **perfil de despliegue inicial V1** está **CERRADA**: **Ubuntu Desktop endurecido + Chromium**, confirmada explícitamente por el responsable del proyecto. Ubuntu Desktop es infraestructura del atril V1, no un requisito de TURNOX Kiosk Web. La validación física de la unidad todavía está pendiente. La Opción A se conserva como alternativa técnica no activa para comparación histórica.
 
 - **Opción A — Ubuntu Server + `cage` + Chromium:** alternativa no seleccionada.
-- **Opción B — Ubuntu Desktop endurecido + Chromium:** opción seleccionada, pendiente de validación física.
+- **Opción B — Ubuntu Desktop endurecido + Chromium:** perfil de despliegue V1 seleccionado, pendiente de validación física.
 
 Ambos perfiles se entregan como plantillas. El perfil Desktop es el activo; el baseline no habilita servicios automáticamente.
 
@@ -91,6 +91,17 @@ Editar `/etc/turnox/kiosk.conf`, propiedad de `root:turnox-kiosk` y con permisos
 | `TURN0X_CA_CERT_PATH` | Ruta externa opcional para la CA administrada; no se almacena el certificado aquí. La instalación del trust requiere procedimiento de infraestructura. |
 
 La configuración no contiene credenciales. El hostname, DNS, PKI/TLS, NTP, RPO/RTO y autonomía de UPS deben ser definidos por infraestructura/operación antes del piloto.
+
+## Responsabilidades y límites
+
+| Elemento | Responsabilidad en V1 |
+|---|---|
+| TURNOX Kiosk | Aplicación web React + TypeScript + Vite; no depende arquitectónicamente de Ubuntu Desktop |
+| Chromium | Runtime de navegador del Kiosk Web en el perfil V1 |
+| Ubuntu Desktop endurecido | Plataforma de despliegue de referencia del atril V1 |
+| Print Agent Linux | Integración local con la impresora; soporte inicial Linux/Ubuntu |
+
+`systemd` y `udev` pertenecen al adapter/plataforma Linux del Print Agent y del baseline de despliegue. El Kiosk Web no debe depender de esos detalles. En el futuro podrían añadirse adapters del Print Agent para otros sistemas operativos sin modificar el dominio ni la aplicación web.
 
 ## Operación
 

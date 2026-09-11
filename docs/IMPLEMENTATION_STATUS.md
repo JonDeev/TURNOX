@@ -36,7 +36,7 @@ Estado: BLOQUEADO
 ## ADR / decisiones
 
 - La fuente de verdad arquitectónica continúa siendo V4.
-- La decisión del atril está cerrada: Ubuntu Desktop endurecido + Chromium en modo kiosco. Se conserva Ubuntu Server + `cage` únicamente como alternativa histórica no seleccionada.
+- El perfil de despliegue inicial V1 del atril está cerrado: Ubuntu Desktop endurecido + Chromium en modo kiosco. Es una decisión de infraestructura, no una dependencia arquitectónica de TURNOX Kiosk Web. Se conserva Ubuntu Server + `cage` únicamente como alternativa histórica no seleccionada.
 - ADR específico: [`docs/adr/ADR-019-kiosk-ubuntu-desktop.md`](adr/ADR-019-kiosk-ubuntu-desktop.md).
 - Los 18 ADR iniciales enumerados en V4 §52 todavía no están redactados; quedan pendientes de los prompts de implementación correspondientes o de una tarea explícita de documentación.
 - La referencia de V4 a un `turnox-platform/docs/adr/` no coincide con el repositorio actual, que aún no contiene `turnox-platform/`. Se conserva la decisión de monolito modular como requisito documental, sin asumir que exista una implementación.
@@ -48,7 +48,7 @@ Estado: BLOQUEADO
 - No existe una unidad física validada de cada componente: mini-PC/atril, pantalla táctil, impresora POS, TV Box/televisor, red y UPS.
 - Falta seleccionar y validar la marca/modelo exactos de la impresora POS.
 - Falta confirmar USB, ESC/POS, cortador y realimentación de estado de papel/tapa/offline de la POS.
-- La variante del atril quedó confirmada como **DECISIÓN CERRADA**: Ubuntu Desktop endurecido + Chromium; falta validarla físicamente y demostrar la sesión dedicada.
+- El perfil de despliegue V1 del atril quedó confirmado como **DECISIÓN CERRADA**: Ubuntu Desktop endurecido + Chromium; falta validarlo físicamente y demostrar la sesión dedicada.
 - Falta seleccionar y validar el TV Box real y su mecanismo de dispositivo dedicado/autoarranque (launcher, Device Owner/Lock Task, MDM u otra opción soportada).
 - Falta validar físicamente calibración táctil, Chromium kiosco, regla udev, impresión, Ethernet, HDMI/overscan, audio, almacenamiento, autoarranque y recuperación tras cortes.
 - Falta validar conectividad LAN, operación sin Internet externo y latencia básica extremo a extremo.
@@ -90,9 +90,9 @@ Estado: BLOQUEADO
 - Se detectó que varias decisiones que V4 marca como pendientes —impresora, TV Box, DNS/PKI/TLS, UPS, RPO y RTO— no pueden cerrarse desde documentación o recomendación de IA. La selección de Ubuntu Desktop fue confirmada explícitamente por el responsable, pero aún requiere evidencia física.
 - La matriz no autoriza marcar una capacidad como confirmada sin evidencia primaria de la unidad y configuración probadas.
 
-## Entregado en P0.2 — baseline del kiosco Linux
+## Entregado en P0.2 — baseline del perfil Linux/Ubuntu V1 del atril
 
-- Se confirmó y cerró Opción B (`Ubuntu Desktop endurecido + Chromium`) como perfil activo; Opción A (`Ubuntu Server + cage + Chromium`) permanece versionada como alternativa no activa.
+- Se confirmó y cerró Opción B (`Ubuntu Desktop endurecido + Chromium`) como perfil de despliegue V1 activo; Opción A (`Ubuntu Server + cage + Chromium`) permanece versionada como alternativa no activa.
 - Se prepararon plantillas para configuración externa, servicio systemd de Chromium, servicio systemd con `cage`, perfil candidato de endurecimiento Desktop, configuración de hostname y zona horaria/NTP LAN.
 - Se documentaron start, stop, status, logs, recuperación, rollback, BIOS y validaciones que requieren acceso físico.
 - El instalador es deliberadamente conservador: crea el usuario dedicado y archivos del baseline, conserva una configuración existente y no instala paquetes, habilita servicios ni toca BIOS.

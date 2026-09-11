@@ -80,13 +80,13 @@ El primer despliegue será una IPS en Colombia, que actúa como cliente cero.
 
 Esta sección condiciona varias decisiones de arquitectura. **Un punto solo se considera CONFIRMADO si fue validado explícitamente por el responsable del proyecto o en Fase 0; una recomendación de una IA no equivale a confirmación.**
 
-## 2.1 Atril / kiosco — CONFIRMADO
+## 2.1 Atril / kiosco — CONFIRMADO — PERFIL DE DESPLIEGUE V1
 
-- Mini-PC con **Ubuntu Desktop endurecido**.
+- Para el despliegue inicial V1 del atril: mini-PC con **Ubuntu Desktop endurecido**.
 - Pantalla táctil.
 - Impresora térmica POS conectada por USB.
 
-Consecuencia directa: **el kiosco no puede ser una APK Android**. Será una aplicación web ejecutada en Chromium en modo kiosco, con un agente local de impresión.
+Consecuencia para este perfil de despliegue: **el kiosco no puede ser una APK Android**. TURNOX Kiosk será una aplicación web ejecutada en Chromium en modo kiosco, con un agente local de impresión. Ubuntu Desktop es una decisión de infraestructura del despliegue inicial V1; no es una dependencia arquitectónica de TURNOX Kiosk.
 
 ## 2.2 Pantallas de sala — CONFIRMADO
 
@@ -194,9 +194,9 @@ Cada decisión incluye su razón. Sin la razón registrada, cualquiera puede rev
 
 El kiosco de toma de turnos será **WEB**, no una APK Android.
 
-La distribución seleccionada para el atril es **Ubuntu Desktop endurecido**. Ubuntu Server + compositor kiosco (`cage`) + Chromium fue considerada como alternativa, pero no es la plataforma seleccionada. Esta decisión no convierte en PASS las validaciones físicas del equipo real.
+El **perfil de despliegue de referencia V1 del atril** es **Ubuntu Desktop endurecido + Chromium en modo kiosco**. Ubuntu Server + compositor kiosco (`cage`) + Chromium fue considerada como alternativa de infraestructura, pero no es el perfil V1 seleccionado. Esta decisión no convierte en PASS las validaciones físicas del equipo real ni crea una dependencia arquitectónica de Ubuntu Desktop para TURNOX Kiosk.
 
-La aplicación React del kiosco permanece separada del sistema operativo. El Print Agent continúa siendo un servicio local independiente; no forma parte de Chromium ni del escritorio.
+TURNOX Kiosk continúa siendo una aplicación web React + TypeScript + Vite, ejecutada mediante navegador y desacoplada del sistema operativo en la medida técnicamente posible. La aplicación React del kiosco permanece separada del sistema operativo. El Print Agent continúa siendo un servicio local independiente; no forma parte de Chromium ni del escritorio.
 
 - React + TypeScript + Vite.
 - Bundle y despliegue separados de la consola administrativa.
@@ -204,9 +204,9 @@ La aplicación React del kiosco permanece separada del sistema operativo. El Pri
 - Sin login del usuario final.
 - Pantalla completa.
 - Retorno automático al inicio tras cada operación o timeout de inactividad.
-- Ejecutado en Chromium en modo kiosco sobre Linux.
+- Ejecutado en Chromium en modo kiosco dentro del perfil de despliegue V1.
 
-**Razón:** el atril confirmado corre Linux, donde una APK no es viable. Además, mantener el kiosco como web permite que TURNOX funcione sobre atriles Windows, Linux o Android sin desarrollar y mantener un cliente nativo por plataforma, lo cual importa si el producto se comercializa. El costo aceptado de esta decisión es la necesidad de un Print Agent local (sección 21).
+**Razón:** el atril del despliegue inicial V1 utiliza Linux, donde una APK no es viable. Mantener TURNOX Kiosk como aplicación web permite incorporar en el futuro otros perfiles de despliegue con navegador sin desarrollar y mantener un cliente nativo por plataforma, lo cual importa si el producto se comercializa. El costo aceptado de esta decisión es la necesidad de un Print Agent local (sección 21), cuyo soporte inicial es Linux/Ubuntu mediante un adapter de plataforma.
 
 ## 3.6 Pantalla de sala / TV — DECISIÓN CERRADA
 
@@ -272,6 +272,8 @@ Una sola aplicación web para administradores, supervisores y asesores. Roles y 
 
 Aplicación React independiente para el atril.
 
+Es una aplicación web ejecutada mediante navegador y no depende arquitectónicamente de Ubuntu Desktop. El navegador es el runtime del Kiosk Web; el perfil Ubuntu Desktop endurecido + Chromium corresponde al despliegue inicial V1 del atril.
+
 Responsabilidades:
 
 - mostrar servicios;
@@ -287,6 +289,8 @@ Responsabilidades:
 ## 4.4 TURNOX Print Agent — Servicio local
 
 Servicio local que ejecuta impresión física y mantiene un canal saliente autenticado con TURNOX API.
+
+En V1 tendrá soporte oficial sobre Linux/Ubuntu. `systemd`, `udev` y el acceso local a la impresora pertenecen al adapter/plataforma Linux, no al dominio ni a TURNOX Kiosk Web. En el futuro podrán agregarse adapters para otros sistemas operativos sin modificar el dominio ni la aplicación web del kiosco.
 
 ## 4.5 TURNOX Display — Android TV
 
@@ -1015,7 +1019,8 @@ El navegador no llama directamente a `localhost`.
 ## 21.2 Implementación
 
 - Node.js + TypeScript.
-- servicio `systemd` en Linux;
+- soporte oficial V1 sobre Linux/Ubuntu;
+- `systemd` y `udev` como detalles del adapter/plataforma Linux;
 - `apps/print-agent`;
 - contratos compartidos;
 - SQLite o storage embebido equivalente;
@@ -1981,7 +1986,7 @@ core-voice
 
 **Razón de la separación:** mezclar el ecosistema Gradle/Kotlin con el de Node en un solo repositorio complica CI sin beneficio operativo.
 
-Nota: `core-printer` no existe en el proyecto Android. La impresión vive en `apps/print-agent` dentro del monorepo TypeScript, porque el kiosco es web sobre Linux.
+Nota: `core-printer` no existe en el proyecto Android. La impresión vive en `apps/print-agent` dentro del monorepo TypeScript, porque TURNOX Kiosk es web y el perfil de despliegue inicial V1 del atril es Linux/Ubuntu.
 
 ---
 
@@ -2081,10 +2086,12 @@ Antes de desarrollo avanzado del kiosco y de la pantalla, validar físicamente *
 - Montaje automático de USB desactivado.
 - Inicio de sesión automático configurado.
 
-**Decisión sobre la distribución — DECISIÓN CERRADA:**
+**Perfil de despliegue de referencia V1 — DECISIÓN CERRADA:**
 
-- **Seleccionada — Ubuntu Desktop endurecido + Chromium:** más familiar de mantener, pero requiere desactivar explícitamente todo lo anterior y sigue expuesto a que GNOME muestre algo encima. Debe operar como sesión dedicada, no como escritorio normal para el público.
-- **Alternativa no seleccionada — Ubuntu Server + compositor kiosco (`cage`) + Chromium:** sin escritorio; el atril queda como un electrodoméstico. Se conserva el razonamiento histórico porque podría ofrecer menor superficie operativa si una decisión posterior revisara la plataforma.
+- **Perfil seleccionado para V1 — Ubuntu Desktop endurecido + Chromium:** más familiar de mantener, pero requiere desactivar explícitamente todo lo anterior y sigue expuesto a que GNOME muestre algo encima. Debe operar como sesión dedicada, no como escritorio normal para el público.
+- **Alternativa de infraestructura no seleccionada — Ubuntu Server + compositor kiosco (`cage`) + Chromium:** sin escritorio; el atril queda como un electrodoméstico. Se conserva el razonamiento histórico porque podría ofrecer menor superficie operativa si una decisión posterior revisara el perfil de despliegue.
+
+Este perfil es una decisión de infraestructura del atril V1. TURNOX Kiosk continúa siendo una aplicación web y no requiere Ubuntu Desktop para funcionar; Chromium es el runtime del Kiosk Web en este perfil. El Print Agent tiene soporte oficial inicial sobre Linux/Ubuntu; `systemd` y `udev` pertenecen a su adapter Linux.
 
 La decisión fue confirmada explícitamente por el responsable del proyecto el 2026-09-10. Autologin real, endurecimiento efectivo, touchscreen, GPU/driver, monitor, BIOS, recuperación eléctrica, red, DNS/TLS/NTP y demás capacidades físicas permanecen pendientes de validación sobre el equipo real.
 
@@ -2409,7 +2416,7 @@ Una decisión solo puede figurar como **CONFIRMADA** si fue confirmada explícit
 
 ## Resueltas
 
-- ~~¿Qué sistema operativo tendrá el atril?~~ **Ubuntu Desktop endurecido + Chromium en modo kiosco.** Ubuntu Server + `cage` fue considerada y queda no seleccionada. La decisión fue confirmada por el responsable del proyecto el 2026-09-10; la validación física del atril continúa pendiente (sección 53.1).
+- ~~¿Qué sistema operativo tendrá el despliegue inicial del atril?~~ **Perfil V1: Ubuntu Desktop endurecido + Chromium en modo kiosco.** Ubuntu Server + `cage` fue considerada y queda no seleccionada. Es una decisión de infraestructura del despliegue inicial; no una dependencia arquitectónica de TURNOX Kiosk Web. La decisión fue confirmada por el responsable del proyecto el 2026-09-10; la validación física del atril continúa pendiente (sección 53.1).
 - ~~¿Los televisores son Android TV, Google TV, Tizen o webOS?~~ **TV Box Android TV / Google TV**, si esto fue confirmado por el responsable del proyecto. El modelo exacto y el mecanismo de modo dedicado quedan para Fase 0.
 
 ## Abiertas — bloquean Fase 0
@@ -2501,12 +2508,14 @@ El MVP es técnicamente exitoso cuando:
 | Contrato realtime | AsyncAPI 3.1 + schemas versionados |
 | Redis | Adapter/fanout/cache cuando aplique |
 | Web | React + TypeScript + Vite + Tailwind + shadcn/ui |
-| Kiosk | React web en Chromium kiosco |
+| Kiosk Web | Aplicación React + TypeScript + Vite ejecutada mediante navegador |
+| Runtime Kiosk Web V1 | Chromium en modo kiosco |
+| Perfil de despliegue del atril V1 | Ubuntu Desktop endurecido |
 | Idempotencia Kiosk | `idempotency_key` durable |
 | Advisor | `AdvisorSession` + `fencing_token` + `command_id` |
 | Queue | PostgreSQL + `FOR UPDATE SKIP LOCKED` + constraints |
 | Journey | `TicketStage` |
-| Print Agent | Node.js + TypeScript + systemd + SQLite |
+| Print Agent | Node.js + TypeScript; soporte inicial Linux/Ubuntu con adapter `systemd`/`udev` + SQLite |
 | Printing | `PrintJob` + `PrintAttempt` + ESC/POS |
 | Display | Kotlin + Jetpack Compose for TV |
 | Recovery Display | `event_id` + `event_seq` + cursor + replay |
